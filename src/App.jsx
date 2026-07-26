@@ -67,16 +67,40 @@ export default function App() {
 
   const ctx = () => ({ supabase, isConfigured, user, setUser, demoData: demoStore })
 
+  // Format current time as "M/DD/YYYY, HH:MM:SS AM/PM"
+  const accessTime = () => {
+    const d = new Date()
+    const pad = (n) => String(n).padStart(2, '0')
+    const mo = d.getMonth() + 1
+    const day = pad(d.getDate())
+    const yr = d.getFullYear()
+    let hh = d.getHours()
+    const mm = pad(d.getMinutes())
+    const ss = pad(d.getSeconds())
+    const ap = hh >= 12 ? 'PM' : 'AM'
+    hh = ((hh + 11) % 12) + 1
+    return `${mo}/${day}/${yr}, ${pad(hh)}:${mm}:${ss} ${ap}`
+  }
+
   // boot + auth session restore
   useEffect(() => {
+    const sep = '─'.repeat(62)
     append([
-      { cls: 'ok', text: 'CCDT v0.3 — SECURE SESSION' },
-      { cls: 'dim', text: 'type "help" for commands. "access <number>" to open a record.' }
+      { cls: 'ok', text: `${sep}` },
+      { cls: 'ok', text: `-------------------------- CCDT  V1.0 ---------------------------` },
+      { cls: 'ok', text: '' },
+      { cls: 'ok', text: 'SECURE, CONTAIN, PROTECT' },
+      { cls: 'ok', text: 'Corporate Central Data Terminal' },
+      { cls: 'ok', text: '' },
+      { cls: 'dim', text: `Access Time: ${accessTime()}` },
+      { cls: 'ok', text: '' },
+      { cls: 'sys', text: "Enter 'help' for available commands or 'access' to quickly access files." },
+      { cls: 'sys', text: "Example: 'access usernames' to access the usernames registry." },
+      { cls: 'ok', text: `${sep}` }
     ])
     if (!isConfigured) {
       append([
-        { cls: 'warn', text: 'DEMO MODE — Supabase not configured. Using sample data + fake auth.' },
-        { cls: 'dim', text: 'Add VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY to a .env file to go live.' }
+        { cls: 'warn', text: 'DEMO MODE — Supabase not configured. Using sample data.' }
       ])
     } else if (supabase) {
       supabase.auth.getSession().then(({ data }) => {
@@ -94,7 +118,12 @@ export default function App() {
     if (screenRef.current) screenRef.current.scrollTop = screenRef.current.scrollHeight
   }, [lines])
 
-  const promptText = () => (user ? `operator@archive:~$` : `guest@archive:~$`)
+  const promptText = () => {
+    if (mode === 'login-email') return 'EMAIL:'
+    if (mode === 'login-pass') return 'PASSWORD:'
+    const name = user ? (user.email || 'admin').split('@')[0] : 'guest'
+    return `${name}@CCDT:~$`
+  }
 
   const wizardPrompt = () => {
     if (!wizard) return ''
@@ -245,7 +274,6 @@ export default function App() {
   return (
     <div className="terminal">
       <div className="terminal__bar">
-        <span>CCDT</span>
         <span className={user ? 'ok' : 'warn'}>
           {user ? `SESSION: ${user.email}` : isConfigured ? 'SESSION: NONE' : 'DEMO MODE'}
         </span>
@@ -265,13 +293,9 @@ export default function App() {
 
       <form className="terminal__input" onSubmit={onSubmit}>
         <span className="prompt">
-          {mode === 'normal'
-            ? promptText()
-            : mode === 'login-email'
-            ? 'EMAIL:'
-            : mode === 'login-pass'
-            ? 'PASSWORD:'
-            : wizardPrompt()}
+          {mode === 'wizard' && wizard
+            ? wizardPrompt()
+            : promptText()}
         </span>
         <input
           autoFocus
@@ -281,7 +305,7 @@ export default function App() {
           onKeyDown={onKeyDown}
           placeholder={
             mode === 'normal'
-              ? 'access 173  ·  create  ·  load'
+              ? "access 173  ·  create  ·  load  ·  help"
               : mode === 'login-email'
               ? 'you@company.com'
               : mode === 'login-pass'

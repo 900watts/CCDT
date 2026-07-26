@@ -42,7 +42,7 @@ const HELP = [
   { cls: 'dim', text: '  whoami            show the current operator + clearance level' },
   { cls: 'dim', text: '  about             what this terminal is' },
   { cls: 'dim', text: '  clear             clear the screen' },
-  { cls: 'dim', text: '  help             show this list' }
+  { cls: 'dim', text: '  help              show this list' }
 ]
 
 // Guided "create" wizard field definitions. `multiline` steps accumulate lines
@@ -388,7 +388,11 @@ export async function runCommand(raw, ctx) {
         { cls: 'ok', text: 'CCDT — CORPORATE CENTRAL DATA TERMINAL' },
         {
           cls: 'dim',
-          text: 'A company document archive, accessed the CCDT way: type a number, get the dossier.'
+          text: 'SECURE, CONTAIN, PROTECT'
+        },
+        {
+          cls: 'dim',
+          text: 'A company document archive. Type a number or keyword to access records.'
         },
         {
           cls: 'dim',
