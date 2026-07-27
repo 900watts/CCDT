@@ -91,17 +91,17 @@ export default function App() {
   useEffect(() => {
     const sep = '─'.repeat(62)
     append([
-      { cls: 'ok', text: `${sep}` },
-      { cls: 'ok', text: `-------------------------- CCDT  V1.0 ---------------------------` },
-      { cls: 'ok', text: '' },
-      { cls: 'ok', text: 'SECURE, CONTAIN, PROTECT' },
-      { cls: 'ok', text: 'Corporate Central Data Terminal' },
-      { cls: 'ok', text: '' },
-      { cls: 'dim', text: `Access Time: ${accessTime()}` },
-      { cls: 'ok', text: '' },
-      { cls: 'sys', text: "Enter 'help' for available commands or 'access' to quickly access files." },
-      { cls: 'sys', text: "Example: 'access usernames' to access the usernames registry." },
-      { cls: 'ok', text: `${sep}` }
+      { cls: 'ok', text: `${sep}`, pinned: true },
+      { cls: 'ok', text: `-------------------------- CCDT  V1.0 ---------------------------`, pinned: true },
+      { cls: 'ok', text: '', pinned: true },
+      { cls: 'ok', text: 'SECURE, CONTAIN, PROTECT', pinned: true },
+      { cls: 'ok', text: 'Corporate Central Data Terminal', pinned: true },
+      { cls: 'ok', text: '', pinned: true },
+      { cls: 'dim', text: `Access Time: ${accessTime()}`, pinned: true },
+      { cls: 'ok', text: '', pinned: true },
+      { cls: 'sys', text: "Enter 'help' for available commands or 'access' to quickly access files.", pinned: true },
+      { cls: 'sys', text: "Example: 'access usernames' to access the usernames registry.", pinned: true },
+      { cls: 'ok', text: `${sep}`, pinned: true }
     ])
     if (!isConfigured) {
       append([
@@ -356,9 +356,9 @@ export default function App() {
     const res = await runCommand(value, ctx())
     const arr = Array.isArray(res) ? res : res.lines || []
 
-    // `clear` empties the screen instead of appending a marker.
+    // `clear` empties the screen BUT keeps the pinned boot banner pinned at the top.
     if (arr.some((l) => l.clear)) {
-      setLines([])
+      setLines((prev) => prev.filter((l) => l.pinned))
       return
     }
 
