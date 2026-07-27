@@ -86,8 +86,8 @@ const HELP = [
   { cls: 'dim', text: '' },
 
   { cls: 'ok', text: '▸ AUTHORING' },
-  { cls: 'sys',  text: '  create                guided wizard — create a new archive document' },
-  { cls: 'dim',  text: '      prompts: number → title → classification → dept → content → tags' },
+  { cls: 'sys',  text: '  create [num "title"]   open the document editor (Word-style window with photos)' },
+  { cls: 'dim',  text: '      fill the form, type Markdown, drag photos or use 📷 PHOTO' },
   { cls: 'sys',  text: '  load                  import a document from a file (.json/.txt/.md)' },
   { cls: 'dim',  text: '      .json maps fields · .txt/.md use filename as title + body as content' },
   { cls: 'dim', text: '' },
@@ -200,11 +200,12 @@ function normalize(raw) {
     classification: String(raw.classification || 'PUBLIC').trim().toUpperCase(),
     department: String(raw.department || '').trim(),
     content: String(raw.content || '').trim(),
-    tags
+    tags,
+    photos: Array.isArray(raw.photos) ? raw.photos : []
   }
 }
 
-async function insertRecord(record, ctx) {
+export async function insertRecord(record, ctx) {
   if (ctx.isConfigured) {
     const { data, error } = await ctx.supabase
       .from('archives')
@@ -702,14 +703,23 @@ export async function runCommand(raw, ctx) {
       return list(args, ctx)
     case 'search':
       return search(args, ctx)
-    case 'create':
+    case 'create': {
+      const guard = authGuard(ctx)
+      if (guard) return guard
+      // Pre-fill with optional inline args: create <number> "<title>"
+      const prefill = {}
+      const titleArgs = []
+      for (let i = 1; i < args.length; i++) titleArgs.push(args[i])
+      if (args[0]) prefill.archive_number = args[0]
+      if (titleArgs.length) prefill.title = titleArgs.join(' ')
       return {
         lines: [
-          { cls: 'ok', text: 'NEW DOCUMENT WIZARD — answer each prompt.' },
-          { cls: 'dim', text: 'type "cancel" at any prompt to abort.' }
+          { cls: 'ok', text: 'OPENING DOCUMENT EDITOR…' },
+          { cls: 'dim', text: 'fill the form, write content in markdown, drag photos onto the editor.' }
         ],
-        wizard: { idx: 0, data: {} }
+        openEditor: prefill
       }
+    }
     case 'load':
     case 'import':
       return {

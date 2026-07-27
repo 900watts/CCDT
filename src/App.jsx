@@ -3,6 +3,7 @@ import { supabase, isConfigured } from './supabaseClient'
 import { runCommand, doLogin, doRegister, doDeleteConfirm, fetchMessage, doMarkRead, CREATE_FIELDS, finalizeCreate, importFile } from './terminal/commands'
 import { demoStore } from './store'
 import { openDossierWindow } from './dossierWindow'
+import { openEditorWindow } from './editorWindow'
 import { openInboxWindow, openComposeWindow, openMessageWindow } from './mailboxWindow'
 import DatabaseView from './DatabaseView'
 
@@ -18,11 +19,12 @@ const nextId = () => `L${lineId++}`
 
 function Dossier({ data }) {
   const order = ['title', 'department', 'content', 'tags', 'created_at']
-  const known = new Set(['archive_number', ...order, 'classification', 'id', 'updated_at'])
+  const known = new Set(['archive_number', ...order, 'classification', 'id', 'updated_at', 'photos'])
   const extra = Object.keys(data).filter((k) => !known.has(k) && data[k] != null)
   const fields = [...order.filter((k) => data[k] != null), ...extra]
   const cls = (data.classification || 'PUBLIC').toUpperCase()
   const color = CLASS_COLOR[cls] || 'var(--fg)'
+  const photos = Array.isArray(data.photos) ? data.photos : []
   return (
     <div className="dossier">
       <div className="dossier__title">
@@ -31,6 +33,15 @@ function Dossier({ data }) {
           {cls}
         </span>
       </div>
+      {photos.length > 0 && (
+        <div className="dossier__photos">
+          {photos.map((p, i) => (
+            <a key={i} href={p.url} target="_blank" rel="noopener" className="dossier__photo">
+              <img src={p.url} alt={p.name || ''} />
+            </a>
+          ))}
+        </div>
+      )}
       {fields.map((k) => (
         <div className="dossier__row" key={k}>
           <div className="dossier__key">{k}</div>
@@ -385,6 +396,7 @@ export default function App() {
     if (!Array.isArray(res)) {
       const liveCtx = ctx()
       if (res.openCompose) openComposeWindow(liveCtx)
+      if (res.openEditor) openEditorWindow(liveCtx, res.openEditor)
       if (res.openMailbox) {
         if (res.openMsgId) {
           const m = await fetchMessage(res.openMsgId, liveCtx)

@@ -121,6 +121,9 @@ html, body, #root {
 .dossier__row { display: flex; gap: 10px; margin-top: 4px; }
 .dossier__key { color: var(--fg-dim); min-width: 130px; text-transform: uppercase; font-size: 12px; }
 .dossier__val { color: var(--fg); white-space: pre-wrap; }
+.dossier__photos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.dossier__photo { display: block; width: 80px; height: 80px; border: 1px solid var(--line); }
+.dossier__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .terminal__input {
   display: flex;
@@ -322,3 +325,43 @@ html, body, #root {
   color: var(--fg); font-family: inherit; font-size: 13px; line-height: 1.6; margin: 0;
 }
 .ccdt-msgview__actions { display: flex; gap: 10px; margin-top: 14px; }
+
+/* ───────── Document Editor window ───────── */
+.ccdt-edit { display: flex; flex-direction: column; height: 100%; padding: 12px 14px; color: var(--fg); font-family: inherit; gap: 8px; min-height: 0; }
+.ccdt-edit__bar { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.ccdt-edit__title { color: var(--fg-bright); font-weight: bold; letter-spacing: 2px; font-size: 13px; }
+.ccdt-edit__save { margin-left: auto; background: var(--fg); color: #05080a; border: none; padding: 6px 14px; cursor: pointer; font: inherit; font-weight: bold; letter-spacing: 1px; font-size: 12px; }
+.ccdt-edit__save:hover { background: var(--fg-bright); }
+.ccdt-edit__cancel { background: transparent; color: var(--fg); border: 1px solid var(--line); padding: 6px 14px; cursor: pointer; font: inherit; letter-spacing: 1px; font-size: 12px; }
+.ccdt-edit__cancel:hover { border-color: var(--fg); }
+.ccdt-edit__form { display: flex; flex-direction: column; gap: 6px; }
+.ccdt-edit__lbl { display: block; font-size: 10px; color: var(--fg-dim); letter-spacing: 1px; text-transform: uppercase; }
+.ccdt-edit__lbl--half { display: inline-block; width: 49%; }
+.ccdt-edit__row { display: flex; gap: 2%; }
+.ccdt-edit__inp { display: block; width: 100%; background: #05080a; color: var(--fg-bright); border: 1px solid var(--line); padding: 5px 8px; margin-top: 3px; font: inherit; font-size: 13px; outline: none; }
+.ccdt-edit__inp:focus { border-color: var(--fg-dim); }
+.ccdt-edit__tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); margin-top: 4px; }
+.ccdt-edit__tab { background: transparent; border: none; color: var(--fg-dim); padding: 6px 14px; cursor: pointer; font: inherit; font-size: 11px; letter-spacing: 1px; }
+.ccdt-edit__tab:hover { color: var(--fg); }
+.ccdt-edit__tab--active { color: var(--fg-bright); border-bottom: 2px solid var(--fg); }
+.ccdt-edit__toolbar { display: flex; gap: 4px; flex-wrap: wrap; padding: 6px 0; }
+.ccdt-edit__toolbar button { background: #05080a; color: var(--fg); border: 1px solid var(--line); padding: 4px 10px; cursor: pointer; font: inherit; font-size: 12px; min-width: 28px; }
+.ccdt-edit__toolbar button:hover { border-color: var(--fg); background: rgba(56,255,154,0.05); }
+.ccdt-edit__body { position: relative; flex: 1; min-height: 200px; display: flex; }
+.ccdt-edit__body textarea { width: 100%; height: 100%; background: #05080a; color: var(--fg-bright); border: 1px solid var(--line); padding: 10px 12px; font: inherit; font-size: 13px; line-height: 1.6; resize: none; outline: none; }
+.ccdt-edit__body textarea:focus { border-color: var(--fg-dim); }
+.ccdt-edit__preview { width: 100%; height: 100%; overflow-y: auto; background: #05080a; border: 1px solid var(--line); padding: 14px 18px; color: var(--fg); }
+.ccdt-edit__preview h1, .ccdt-edit__preview h2, .ccdt-edit__preview h3 { color: var(--fg-bright); margin: 14px 0 6px; }
+.ccdt-edit__preview h1 { font-size: 22px; } .ccdt-edit__preview h2 { font-size: 18px; } .ccdt-edit__preview h3 { font-size: 14px; }
+.ccdt-edit__preview p { margin: 6px 0; }
+.ccdt-edit__preview ul { margin: 6px 0 6px 20px; }
+.ccdt-edit__preview blockquote { border-left: 3px solid var(--fg); padding-left: 10px; color: var(--fg-dim); margin: 6px 0; }
+.ccdt-edit__drop { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(5,8,10,0.85); color: var(--fg-bright); font-size: 14px; letter-spacing: 2px; border: 2px dashed var(--fg); pointer-events: none; }
+.ccdt-edit__photos { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); max-height: 110px; overflow-y: auto; }
+.ccdt-edit__photos:empty { display: none; }
+.ccdt-edit__photos-label { width: 100%; color: var(--fg-dim); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+.ccdt-edit__photo { position: relative; width: 80px; height: 80px; border: 1px solid var(--line); background: #0a0f12; display: flex; align-items: center; justify-content: center; }
+.ccdt-edit__photo img { max-width: 100%; max-height: 100%; object-fit: cover; }
+.ccdt-edit__photo-name { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); color: var(--fg-dim); font-size: 9px; padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ccdt-edit__photo-rm { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7); color: #ff5b5b; border: none; width: 16px; height: 16px; cursor: pointer; line-height: 14px; font-size: 12px; padding: 0; }
+.ccdt-edit__status { color: var(--fg-dim); font-size: 11px; padding-top: 4px; text-align: right; min-height: 16px; }
