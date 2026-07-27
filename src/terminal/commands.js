@@ -23,26 +23,51 @@ function requiredLevel(rec) {
 }
 
 // The operator's current clearance level (defaults to 1 / PUBLIC when unset).
-function getClearance(ctx) {
+export function getClearance(ctx) {
   const raw = ctx.user && (ctx.user.clearance_level ?? ctx.user.user_metadata?.clearance_level)
   const lvl = Number(raw)
   return Number.isFinite(lvl) && lvl > 0 ? Math.min(lvl, MAX_CLEARANCE) : 1
 }
 
 const HELP = [
-  { cls: 'ok', text: 'AVAILABLE COMMANDS' },
-  { cls: 'dim', text: '  access <number>   retrieve an archive record by its number' },
-  { cls: 'dim', text: '  list [n]          list the n most recent archives (default 10)' },
-  { cls: 'dim', text: '  search <query>    search archives by title / content' },
-  { cls: 'dim', text: '  create            create a new archive document (guided)' },
-  { cls: 'dim', text: '  load              import a document from a file (.json/.txt/.md)' },
-  { cls: 'dim', text: '  login [email pw]  authenticate (prompts if no args given)' },
-  { cls: 'dim', text: '  register <em> <pw> <lvl>  create an operator account (clearance 1-4)' },
-  { cls: 'dim', text: '  logout            end the current session' },
-  { cls: 'dim', text: '  whoami            show the current operator + clearance level' },
-  { cls: 'dim', text: '  about             what this terminal is' },
-  { cls: 'dim', text: '  clear             clear the screen' },
-  { cls: 'dim', text: '  help              show this list' }
+  { cls: 'ok', text: '═══════════════ CCDT COMMAND REFERENCE ═══════════════' },
+  { cls: 'dim', text: '' },
+
+  { cls: 'ok', text: '▸ ACCESS' },
+  { cls: 'sys',  text: '  access <number>       open archive #<number> in a viewer window' },
+  { cls: 'dim',  text: '      e.g. access 173   ·  access usernames' },
+  { cls: 'sys',  text: '  list [n]              list the n most recent archives (default 10)' },
+  { cls: 'sys',  text: '  search <query>        full-text search across title + content' },
+  { cls: 'dim',  text: '      e.g. search payroll · search "q3 report"' },
+  { cls: 'dim', text: '' },
+
+  { cls: 'ok', text: '▸ AUTHORING' },
+  { cls: 'sys',  text: '  create                guided wizard — create a new archive document' },
+  { cls: 'dim',  text: '      prompts: number → title → classification → dept → content → tags' },
+  { cls: 'sys',  text: '  load                  import a document from a file (.json/.txt/.md)' },
+  { cls: 'dim',  text: '      .json maps fields · .txt/.md use filename as title + body as content' },
+  { cls: 'dim', text: '' },
+
+  { cls: 'ok', text: '▸ SESSION' },
+  { cls: 'sys',  text: '  login [email pw]      authenticate (prompts if no args given)' },
+  { cls: 'sys',  text: '  register <em> <pw> <lvl>  create an operator account (clearance 1-4)' },
+  { cls: 'dim',  text: '      e.g. register me@corp.com hunter2 3' },
+  { cls: 'sys',  text: '  logout                end the current session' },
+  { cls: 'sys',  text: '  whoami                show current operator + clearance level' },
+  { cls: 'dim', text: '' },
+
+  { cls: 'ok', text: '▸ NAVIGATION' },
+  { cls: 'sys',  text: '  database              switch to the visual DATABASE browser' },
+  { cls: 'sys',  text: '  terminal              switch back to the terminal' },
+  { cls: 'dim', text: '' },
+
+  { cls: 'ok', text: '▸ SYSTEM' },
+  { cls: 'sys',  text: '  about                 what this terminal is' },
+  { cls: 'sys',  text: '  clear                 clear the screen' },
+  { cls: 'sys',  text: '  help                  show this reference' },
+  { cls: 'dim', text: '' },
+  { cls: 'dim', text: '  clearance levels: 1 PUBLIC · 2 CONFIDENTIAL · 3 SECRET · 4 TOP SECRET' },
+  { cls: 'dim', text: '  tip: ↑/↓ scroll command history · blank line finishes multi-line input' }
 ]
 
 // Guided "create" wizard field definitions. `multiline` steps accumulate lines
@@ -79,9 +104,32 @@ function authGuard(ctx) {
 
 function dossierLines(row) {
   return [
-    { cls: 'ok', text: `ACCESS GRANTED // ARCHIVE ${row.archive_number}` },
-    { cls: 'dossier', data: row }
+    { cls: 'ok', text: `ACCESS GRANTED // ARCHIVE ${row.archive_number} — opening viewer window…` },
+    { cls: 'window', data: row }
   ]
+}
+
+// Used by the DATABASE tab to fetch the readable archive list (RLS filters
+// live mode; DEMO mode filters client-side by clearance).
+export async function fetchList(ctx) {
+  if (ctx.isConfigured) {
+    const { data, error } = await ctx.supabase
+      .from('archives')
+      .select('archive_number,title,classification,department,created_at')
+      .order('archive_number', { ascending: true })
+      .limit(200)
+    if (error) return []
+    return data || []
+  }
+  return ctx.demoData
+    .filter((a) => requiredLevel(a) <= getClearance(ctx))
+    .map((a) => ({
+      archive_number: a.archive_number,
+      title: a.title,
+      classification: a.classification,
+      department: a.department,
+      created_at: a.created_at
+    }))
 }
 
 function deniedLines(num, rec, have) {
@@ -128,6 +176,25 @@ async function insertRecord(record, ctx) {
     { cls: 'ok', text: `DOCUMENT COMMITTED (DEMO) // ARCHIVE ${record.archive_number}` },
     { cls: 'dim', text: 'stored in local session only — connect Supabase to persist.' }
   ]
+}
+
+// Fetch a single full archive record (clearance-respecting). Used by the
+// DATABASE tab when a card is clicked. Returns { ok, data, reason }.
+export async function fetchOne(num, ctx) {
+  if (ctx.isConfigured) {
+    const { data, error } = await ctx.supabase
+      .from('archives')
+      .select('*')
+      .eq('archive_number', String(num))
+      .maybeSingle()
+    if (error) return { ok: false, reason: error.message }
+    if (!data) return { ok: false, reason: 'not_found' }
+    return { ok: true, data }
+  }
+  const row = ctx.demoData.find((a) => a.archive_number === String(num))
+  if (!row) return { ok: false, reason: 'not_found' }
+  if (requiredLevel(row) > getClearance(ctx)) return { ok: false, reason: 'denied' }
+  return { ok: true, data: row }
 }
 
 async function access(args, ctx) {

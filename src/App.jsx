@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { supabase, isConfigured } from './supabaseClient'
 import { runCommand, doLogin, CREATE_FIELDS, finalizeCreate, importFile } from './terminal/commands'
 import { demoStore } from './store'
+import { openDossierWindow } from './dossierWindow'
+import DatabaseView from './DatabaseView'
 
 const CLASS_COLOR = {
   SECRET: 'var(--secret)',
@@ -53,6 +55,7 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [history, setHistory] = useState([])
   const [wizard, setWizard] = useState(null) // { idx, data }
+  const [view, setView] = useState('terminal') // terminal | database
   const histIdx = useRef(-1)
   const pending = useRef({ email: '' })
   const screenRef = useRef(null)
@@ -211,6 +214,17 @@ export default function App() {
     }
 
     // ----- normal mode -----
+    const trimmed = value.trim().toLowerCase()
+    if (trimmed === 'database') {
+      append([{ cls: 'echo', text: `${promptText()} ${value}` }])
+      setView('database')
+      return
+    }
+    if (trimmed === 'terminal') {
+      append([{ cls: 'echo', text: `${promptText()} ${value}` }])
+      setView('terminal')
+      return
+    }
     if (value.trim().toLowerCase() === 'login') {
       append([{ cls: 'echo', text: `${promptText()} login` }])
       setMode('login-email')
@@ -231,15 +245,16 @@ export default function App() {
       histIdx.current = -1
     }
     const res = await runCommand(value, ctx())
-    if (Array.isArray(res)) {
-      append(res)
-    } else {
-      append(res.lines || [])
-      if (res.wizard) {
-        setWizard(res.wizard)
-        setMode('wizard')
-        append([{ cls: 'promptline', text: CREATE_FIELDS[res.wizard.idx].prompt }])
-      }
+    const arr = Array.isArray(res) ? res : res.lines || []
+    // "window" lines spawn a draggable viewer (WinBox); they are not printed.
+    const windows = arr.filter((l) => l.cls === 'window')
+    const printable = arr.filter((l) => l.cls !== 'window')
+    windows.forEach((w) => openDossierWindow(w.data))
+    if (printable.length) append(printable)
+    if (!Array.isArray(res) && res.wizard) {
+      setWizard(res.wizard)
+      setMode('wizard')
+      append([{ cls: 'promptline', text: CREATE_FIELDS[res.wizard.idx].prompt }])
     }
   }
 
@@ -274,50 +289,68 @@ export default function App() {
   return (
     <div className="terminal">
       <div className="terminal__bar">
+        <div className="tabs">
+          <button
+            className={`tab${view === 'terminal' ? ' tab--active' : ''}`}
+            onClick={() => setView('terminal')}
+          >
+            TERMINAL
+          </button>
+          <button
+            className={`tab${view === 'database' ? ' tab--active' : ''}`}
+            onClick={() => setView('database')}
+          >
+            DATABASE
+          </button>
+        </div>
         <span className={user ? 'ok' : 'warn'}>
           {user ? `SESSION: ${user.email}` : isConfigured ? 'SESSION: NONE' : 'DEMO MODE'}
         </span>
       </div>
 
-      <div className="terminal__screen" ref={screenRef}>
-        {rendered.map((l) =>
-          l.cls === 'dossier' ? (
-            <Dossier key={l.id} data={l.data} />
-          ) : (
-            <div key={l.id} className={`line ${l.cls || 'sys'}`}>
-              {l.text}
-            </div>
-          )
-        )}
+      <div className="terminal__main" style={{ display: view === 'terminal' ? 'flex' : 'none' }}>
+        <div className="terminal__screen" ref={screenRef}>
+          {rendered.map((l) =>
+            l.cls === 'dossier' ? (
+              <Dossier key={l.id} data={l.data} />
+            ) : (
+              <div key={l.id} className={`line ${l.cls || 'sys'}`}>
+                {l.text}
+              </div>
+            )
+          )}
+        </div>
+
+        <form className="terminal__input" onSubmit={onSubmit}>
+          <span className="prompt">
+            {mode === 'wizard' && wizard
+              ? wizardPrompt()
+              : promptText()}
+          </span>
+          <input
+            autoFocus
+            value={input}
+            type={mode === 'login-pass' ? 'password' : 'text'}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder={
+              mode === 'normal'
+                ? "access 173  ·  database  ·  create  ·  help"
+                : mode === 'login-email'
+                ? 'you@company.com'
+                : mode === 'login-pass'
+                ? '••••••••'
+                : mode === 'wizard' && wizard
+                ? CREATE_FIELDS[wizard.idx]?.prompt || ''
+                : ''
+            }
+            spellCheck={false}
+            autoComplete="off"
+          />
+        </form>
       </div>
 
-      <form className="terminal__input" onSubmit={onSubmit}>
-        <span className="prompt">
-          {mode === 'wizard' && wizard
-            ? wizardPrompt()
-            : promptText()}
-        </span>
-        <input
-          autoFocus
-          value={input}
-          type={mode === 'login-pass' ? 'password' : 'text'}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder={
-            mode === 'normal'
-              ? "access 173  ·  create  ·  load  ·  help"
-              : mode === 'login-email'
-              ? 'you@company.com'
-              : mode === 'login-pass'
-              ? '••••••••'
-              : mode === 'wizard' && wizard
-              ? CREATE_FIELDS[wizard.idx]?.prompt || ''
-              : ''
-          }
-          spellCheck={false}
-          autoComplete="off"
-        />
-      </form>
+      {view === 'database' && <DatabaseView user={user} />}
 
       <input
         ref={fileInputRef}
