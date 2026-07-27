@@ -5,7 +5,7 @@
 //
 // A line is: { cls, text } | { clear: true } | { cls: 'dossier', data }
 
-import { addDemoArchive } from '../store'
+import { addDemoArchive, removeDemoArchive } from '../store'
 
 const DEMO_USER = { id: 'demo-agent', email: 'agent@archive.local' }
 
@@ -39,6 +39,8 @@ const HELP = [
   { cls: 'sys',  text: '  list [n]              list the n most recent archives (default 10)' },
   { cls: 'sys',  text: '  search <query>        full-text search across title + content' },
   { cls: 'dim',  text: '      e.g. search payroll · search "q3 report"' },
+  { cls: 'sys',  text: '  delete <number>       delete an archive (must be yours or clearance >= its level)' },
+  { cls: 'dim',  text: '      asks you to type "I\'m sure" before removing the record' },
   { cls: 'dim', text: '' },
 
   { cls: 'ok', text: '▸ AUTHORING' },
@@ -348,6 +350,75 @@ export async function doLogout(ctx) {
   return [{ cls: 'ok', text: 'SESSION TERMINATED.' }]
 }
 
+// delete <num> — check eligibility (you created it OR your clearance >= the
+// record's required clearance) and, if allowed, ask the operator to type
+// "I'm sure" before the row is removed.
+export async function doDelete(args, ctx) {
+  const guard = authGuard(ctx)
+  if (guard) return guard
+  const num = args[0]
+  if (!num) return [{ cls: 'warn', text: 'usage: delete <number>' }]
+
+  if (ctx.isConfigured) {
+    const { data, error } = await ctx.supabase.rpc('peek_delete', { p_num: num })
+    if (error) return [{ cls: 'err', text: `QUERY ERROR: ${error.message}` }]
+    if (!data || data.status === 'not_found')
+      return [{ cls: 'err', text: `ARCHIVE ${num} NOT FOUND` }]
+    if (data.status === 'denied') {
+      return [
+        { cls: 'err', text: `DELETE DENIED // ARCHIVE ${num}` },
+        {
+          cls: 'dim',
+          text: `requires level ${data.required} (${data.classification}) or ownership; you hold level ${data.have}.`
+        }
+      ]
+    }
+    const mine = data.created_by_me ? '(created by you)' : '(clearance override)'
+    return {
+      lines: [
+        { cls: 'warn', text: `DELETE ARCHIVE ${num} — ${data.title} [${data.classification}] ${mine}` },
+        { cls: 'dim', text: `this is permanent. type "I'm sure" to confirm, or anything else to cancel.` }
+      ],
+      confirmDelete: num
+    }
+  }
+
+  // DEMO: authorize by clearance only (demo records have no creator tracking).
+  const row = ctx.demoData.find((a) => a.archive_number === String(num))
+  if (!row) return [{ cls: 'err', text: `ARCHIVE ${num} NOT FOUND` }]
+  const have = getClearance(ctx)
+  if (requiredLevel(row) > have) {
+    return [
+      { cls: 'err', text: `DELETE DENIED // ARCHIVE ${num}` },
+      { cls: 'dim', text: `requires level ${requiredLevel(row)} (${row.classification}); you hold level ${have}.` }
+    ]
+  }
+  return {
+    lines: [
+      { cls: 'warn', text: `DELETE ARCHIVE ${num} — ${row.title} [${row.classification}]` },
+      { cls: 'dim', text: `this is permanent. type "I'm sure" to confirm, or anything else to cancel.` }
+    ],
+    confirmDelete: num
+  }
+}
+
+// Called after the operator types "I'm sure".
+export async function doDeleteConfirm(num, ctx) {
+  if (ctx.isConfigured) {
+    const { data, error } = await ctx.supabase.rpc('delete_archive', { p_num: num })
+    if (error) return [{ cls: 'err', text: `DELETE FAILED: ${error.message}` }]
+    if (!data || data.status === 'not_found')
+      return [{ cls: 'err', text: `ARCHIVE ${num} NOT FOUND (already gone?)` }]
+    if (data.status === 'denied')
+      return [{ cls: 'err', text: `DELETE DENIED // ARCHIVE ${num} — eligibility changed.` }]
+    return [{ cls: 'ok', text: `ARCHIVE ${num} DELETED — "${data.title}" removed.` }]
+  }
+  const ok = removeDemoArchive(num)
+  return ok
+    ? [{ cls: 'ok', text: `ARCHIVE ${num} DELETED (DEMO).` }]
+    : [{ cls: 'err', text: `ARCHIVE ${num} NOT FOUND` }]
+}
+
 // Finalize a "create" wizard: build + insert the record.
 export async function finalizeCreate(data, ctx) {
   const guard = authGuard(ctx)
@@ -442,6 +513,8 @@ export async function runCommand(raw, ctx) {
       return doLogin(args[0], args[1], ctx)
     case 'register':
       return doRegister(args, ctx)
+    case 'delete':
+      return doDelete(args, ctx)
     case 'logout':
       return doLogout(ctx)
     case 'whoami':

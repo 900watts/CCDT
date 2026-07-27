@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { supabase, isConfigured } from './supabaseClient'
-import { runCommand, doLogin, CREATE_FIELDS, finalizeCreate, importFile } from './terminal/commands'
+import { runCommand, doLogin, doDeleteConfirm, CREATE_FIELDS, finalizeCreate, importFile } from './terminal/commands'
 import { demoStore } from './store'
 import { openDossierWindow } from './dossierWindow'
 import DatabaseView from './DatabaseView'
@@ -50,12 +50,13 @@ function fmt(v) {
 export default function App() {
   const [lines, setLines] = useState([])
   const [input, setInput] = useState('')
-  // mode: normal | login-email | login-pass | wizard
+  // mode: normal | login-email | login-pass | wizard | confirm-delete
   const [mode, setMode] = useState('normal')
   const [user, setUser] = useState(null)
   const [history, setHistory] = useState([])
   const [wizard, setWizard] = useState(null) // { idx, data }
   const [view, setView] = useState('terminal') // terminal | database
+  const [pendingDelete, setPendingDelete] = useState(null) // archive_number awaiting "I'm sure"
   const histIdx = useRef(-1)
   const pending = useRef({ email: '' })
   const screenRef = useRef(null)
@@ -124,6 +125,7 @@ export default function App() {
   const promptText = () => {
     if (mode === 'login-email') return 'EMAIL:'
     if (mode === 'login-pass') return 'PASSWORD:'
+    if (mode === 'confirm-delete') return 'CONFIRM>'
     const name = user ? (user.email || 'admin').split('@')[0] : 'guest'
     return `${name}@CCDT:~$`
   }
@@ -155,6 +157,22 @@ export default function App() {
       const res = await doLogin(email, value, ctx())
       setMode('normal')
       append(res)
+      return
+    }
+
+    // ----- confirm-delete mode: operator must type "I'm sure" -----
+    if (mode === 'confirm-delete' && pendingDelete) {
+      const num = pendingDelete
+      const typed = value.trim()
+      append([{ cls: 'echo', text: `${promptText()} ${value}` }])
+      setMode('normal')
+      setPendingDelete(null)
+      if (typed.toLowerCase() === "i'm sure") {
+        const res = await doDeleteConfirm(num, ctx())
+        append(res)
+      } else {
+        append([{ cls: 'dim', text: 'DELETE CANCELLED.' }])
+      }
       return
     }
 
@@ -246,15 +264,30 @@ export default function App() {
     }
     const res = await runCommand(value, ctx())
     const arr = Array.isArray(res) ? res : res.lines || []
+
+    // `clear` empties the screen instead of appending a marker.
+    if (arr.some((l) => l.clear)) {
+      setLines([])
+      return
+    }
+
     // "window" lines spawn a draggable viewer (WinBox); they are not printed.
     const windows = arr.filter((l) => l.cls === 'window')
-    const printable = arr.filter((l) => l.cls !== 'window')
+    const printable = arr.filter((l) => l.cls !== 'window' && !l.clear)
     windows.forEach((w) => openDossierWindow(w.data))
     if (printable.length) append(printable)
+
+    // wizard (create) — start guided multi-step flow
     if (!Array.isArray(res) && res.wizard) {
       setWizard(res.wizard)
       setMode('wizard')
       append([{ cls: 'promptline', text: CREATE_FIELDS[res.wizard.idx].prompt }])
+    }
+
+    // delete — enter confirm-delete mode, awaiting "I'm sure"
+    if (!Array.isArray(res) && res.confirmDelete != null) {
+      setPendingDelete(res.confirmDelete)
+      setMode('confirm-delete')
     }
   }
 
@@ -333,17 +366,19 @@ export default function App() {
             type={mode === 'login-pass' ? 'password' : 'text'}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder={
-              mode === 'normal'
-                ? "access 173  ·  database  ·  create  ·  help"
-                : mode === 'login-email'
-                ? 'you@company.com'
-                : mode === 'login-pass'
-                ? '••••••••'
-                : mode === 'wizard' && wizard
-                ? CREATE_FIELDS[wizard.idx]?.prompt || ''
-                : ''
-            }
+          placeholder={
+            mode === 'normal'
+              ? "access 173  ·  database  ·  create  ·  help"
+              : mode === 'login-email'
+              ? 'you@company.com'
+              : mode === 'login-pass'
+              ? '••••••••'
+              : mode === 'confirm-delete'
+              ? "type \"I'm sure\" to confirm, or anything else to cancel"
+              : mode === 'wizard' && wizard
+              ? CREATE_FIELDS[wizard.idx]?.prompt || ''
+              : ''
+          }
             spellCheck={false}
             autoComplete="off"
           />

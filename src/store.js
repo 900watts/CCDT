@@ -8,3 +8,9 @@ export function addDemoArchive(a) {
   demoStore.push(a)
   return a
 }
+
+export function removeDemoArchive(num) {
+  const i = demoStore.findIndex((a) => a.archive_number === String(num))
+  if (i >= 0) demoStore.splice(i, 1)
+  return i >= 0
+}
