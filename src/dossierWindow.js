@@ -2,6 +2,7 @@
 // "access XXX spawns a browser on screen" UX as the original SCiPNET terminal.
 import WinBox from 'winbox/src/js/winbox.js'
 import 'winbox/dist/css/winbox.min.css'
+import { md2html } from './markdown'
 
 const CLASS_COLOR = {
   SECRET: '#ff4d6d',
@@ -29,6 +30,17 @@ export function openDossierWindow(row) {
         hour: '2-digit', minute: '2-digit'
       })
     : '—'
+  const photos = Array.isArray(row.photos) ? row.photos : []
+  const photoGrid = photos.length
+    ? `<div class="ccdt-dossier__photos">${photos
+        .map(
+          (p) =>
+            `<a href="${esc(p.url)}" target="_blank" rel="noopener" class="ccdt-dossier__photo"><img src="${esc(
+              p.url
+            )}" alt="${esc(p.name || '')}" /></a>`
+        )
+        .join('')}</div>`
+    : ''
 
   const html = `
     <div class="ccdt-dossier">
@@ -41,7 +53,8 @@ export function openDossierWindow(row) {
       <div class="ccdt-dossier__meta"><span>Tags</span>${esc(tags)}</div>
       <div class="ccdt-dossier__meta"><span>Created</span>${esc(created)}</div>
       <hr class="ccdt-dossier__rule" />
-      <pre class="ccdt-dossier__content">${esc(row.content || '(no content)')}</pre>
+      ${photoGrid}
+      <div class="ccdt-dossier__content">${md2html(row.content) || '<em>(no content)</em>'}</div>
     </div>`
 
   return new WinBox({

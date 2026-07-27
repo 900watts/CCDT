@@ -121,6 +121,16 @@ html, body, #root {
 .dossier__row { display: flex; gap: 10px; margin-top: 4px; }
 .dossier__key { color: var(--fg-dim); min-width: 130px; text-transform: uppercase; font-size: 12px; }
 .dossier__val { color: var(--fg); white-space: pre-wrap; }
+.dossier__content { white-space: normal; }
+.dossier__content h1 { font-size: 19px; margin: 12px 0 6px; color: var(--fg); }
+.dossier__content h2 { font-size: 16px; margin: 10px 0 5px; color: var(--fg); }
+.dossier__content h3 { font-size: 14px; margin: 8px 0 4px; color: var(--fg); }
+.dossier__content p { margin: 6px 0; }
+.dossier__content ul { margin: 6px 0 6px 20px; padding: 0; }
+.dossier__content li { margin: 2px 0; }
+.dossier__content blockquote { margin: 8px 0; padding: 6px 12px; border-left: 3px solid var(--line); color: var(--fg-dim); background: rgba(255,255,255,0.02); }
+.dossier__content a { color: var(--pub); }
+.dossier__content img { max-width: 100%; border: 1px solid var(--line); margin: 8px 0; border-radius: 3px; }
 .dossier__photos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .dossier__photo { display: block; width: 80px; height: 80px; border: 1px solid var(--line); }
 .dossier__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -236,10 +246,29 @@ html, body, #root {
 .ccdt-dossier__meta span { color: var(--fg-dim); min-width: 90px; text-transform: uppercase; letter-spacing: 1px; }
 .ccdt-dossier__rule { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
 .ccdt-dossier__content {
-  white-space: pre-wrap; word-break: break-word;
+  white-space: normal; word-break: break-word;
   color: var(--fg); font-family: inherit; font-size: 13px; line-height: 1.6;
   margin: 0;
 }
+.ccdt-dossier__content h1 { font-size: 19px; margin: 12px 0 6px; color: var(--fg); }
+.ccdt-dossier__content h2 { font-size: 16px; margin: 10px 0 5px; color: var(--fg); }
+.ccdt-dossier__content h3 { font-size: 14px; margin: 8px 0 4px; color: var(--fg); }
+.ccdt-dossier__content p { margin: 6px 0; }
+.ccdt-dossier__content ul { margin: 6px 0 6px 20px; padding: 0; }
+.ccdt-dossier__content li { margin: 2px 0; }
+.ccdt-dossier__content blockquote {
+  margin: 8px 0; padding: 6px 12px; border-left: 3px solid var(--line);
+  color: var(--fg-dim); background: rgba(255,255,255,0.02);
+}
+.ccdt-dossier__content a { color: var(--pub); }
+.ccdt-dossier__content img {
+  max-width: 100%; border: 1px solid #11331f; margin: 8px 0; border-radius: 3px;
+}
+.ccdt-dossier__photos {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0;
+}
+.ccdt-dossier__photo { display: block; width: 90px; height: 90px; overflow: hidden; border: 1px solid #11331f; border-radius: 3px; }
+.ccdt-dossier__photo img { width: 100%; height: 100%; object-fit: cover; margin: 0; border: none; }
 
 /* ───────── Mailbox windows ───────── */
 .ccdt-mail, .ccdt-compose, .ccdt-msgview { padding: 14px 16px; color: var(--fg); font-family: inherit; }

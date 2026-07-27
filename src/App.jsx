@@ -4,6 +4,7 @@ import { runCommand, doLogin, doRegister, doDeleteConfirm, fetchMessage, doMarkR
 import { demoStore } from './store'
 import { openDossierWindow } from './dossierWindow'
 import { openEditorWindow } from './editorWindow'
+import { md2html } from './markdown'
 import { openInboxWindow, openComposeWindow, openMessageWindow } from './mailboxWindow'
 import DatabaseView from './DatabaseView'
 
@@ -45,7 +46,14 @@ function Dossier({ data }) {
       {fields.map((k) => (
         <div className="dossier__row" key={k}>
           <div className="dossier__key">{k}</div>
-          <div className="dossier__val">{fmt(data[k])}</div>
+          {k === 'content' ? (
+            <div
+              className="dossier__val dossier__content"
+              dangerouslySetInnerHTML={{ __html: md2html(data[k]) || '<em>(no content)</em>' }}
+            />
+          ) : (
+            <div className="dossier__val">{fmt(data[k])}</div>
+          )}
         </div>
       ))}
     </div>

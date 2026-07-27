@@ -5,6 +5,7 @@ import WinBox from 'winbox/src/js/winbox.js'
 import 'winbox/dist/css/winbox.min.css'
 
 import { insertRecord } from './terminal/commands'
+import { md2html } from './markdown'
 
 const CLASSIFICATIONS = ['PUBLIC', 'CONFIDENTIAL', 'SECRET', 'TOP SECRET']
 const MAX_FILE_BYTES = 10 * 1024 * 1024  // 10 MB
@@ -13,53 +14,6 @@ function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
-
-// Render Markdown -> HTML (a tiny subset; no deps). Supports the toolbar's
-// formats: # ## ### ** * lists - > ![](url) [text](url).
-function md2html(md) {
-  if (!md) return ''
-  const lines = md.split('\n')
-  let out = ''
-  let inList = false
-  let inQuote = false
-  const closeList = () => { if (inList) { out += '</ul>'; inList = false } }
-  const closeQuote = () => { if (inQuote) { out += '</blockquote>'; inQuote = false } }
-  for (const raw of lines) {
-    const line = raw
-    if (/^###\s/.test(line)) { closeList(); closeQuote(); out += `<h3>${esc(line.slice(4))}</h3>`; continue }
-    if (/^##\s/.test(line))  { closeList(); closeQuote(); out += `<h2>${esc(line.slice(3))}</h2>`; continue }
-    if (/^#\s/.test(line))   { closeList(); closeQuote(); out += `<h1>${esc(line.slice(2))}</h1>`; continue }
-    if (/^>\s/.test(line)) {
-      closeList();
-      if (!inQuote) { out += '<blockquote>'; inQuote = true }
-      out += `<div>${inlineMd(esc(line.slice(2)))}</div>`
-      continue
-    }
-    if (/^[-*]\s/.test(line)) {
-      closeQuote();
-      if (!inList) { out += '<ul>'; inList = true }
-      out += `<li>${inlineMd(esc(line.slice(2)))}</li>`
-      continue
-    }
-    if (line.trim() === '') { closeList(); closeQuote(); out += '<br/>'; continue }
-    closeList(); closeQuote()
-    out += `<p>${inlineMd(esc(line))}</p>`
-  }
-  closeList(); closeQuote()
-  return out
-}
-
-function inlineMd(s) {
-  // already HTML-escaped; just upgrade **bold** *italic* and links/images
-  // Note: order matters (img before link because ![...](...) begins with !)
-  return s
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) =>
-      `<img src="${url}" alt="${alt}" style="max-width:100%;border:1px solid #11331f;margin:6px 0" />`)
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, t, u) =>
-      `<a href="${u}" target="_blank" rel="noopener" style="color:#38ff9a">${t}</a>`)
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
 }
 
 function fileToDataUrl(file) {
