@@ -4,3 +4,5 @@ dist/
 tmp/
 *.timestamp-*.mjs
 .DS_Store
+
+.vercel
