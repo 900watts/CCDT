@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { supabase, isConfigured } from './supabaseClient'
-import { runCommand, doLogin, doDeleteConfirm, CREATE_FIELDS, finalizeCreate, importFile } from './terminal/commands'
+import { runCommand, doLogin, doRegister, doDeleteConfirm, CREATE_FIELDS, finalizeCreate, importFile } from './terminal/commands'
 import { demoStore } from './store'
 import { openDossierWindow } from './dossierWindow'
 import DatabaseView from './DatabaseView'
@@ -125,6 +125,9 @@ export default function App() {
   const promptText = () => {
     if (mode === 'login-email') return 'EMAIL:'
     if (mode === 'login-pass') return 'PASSWORD:'
+    if (mode === 'register-email') return 'EMAIL:'
+    if (mode === 'register-pass') return 'PASSWORD:'
+    if (mode === 'register-level') return 'CLEARANCE [1-4]:'
     if (mode === 'confirm-delete') return 'CONFIRM>'
     const name = user ? (user.email || 'admin').split('@')[0] : 'guest'
     return `${name}@CCDT:~$`
@@ -156,6 +159,41 @@ export default function App() {
       append([{ cls: 'echo', text: `EMAIL: ${email}` }, { cls: 'echo', text: 'PASSWORD: ********' }])
       const res = await doLogin(email, value, ctx())
       setMode('normal')
+      append(res)
+      return
+    }
+
+    // ----- guided register (bare `register`): email → password → clearance -----
+    if (mode === 'register-email') {
+      const email = value.trim()
+      if (!email) {
+        append([{ cls: 'err', text: 'EMAIL REQUIRED' }])
+        return
+      }
+      pending.current.regEmail = email
+      setMode('register-pass')
+      return
+    }
+    if (mode === 'register-pass') {
+      const pw = value
+      if (!pw) {
+        append([{ cls: 'err', text: 'PASSWORD REQUIRED' }])
+        return
+      }
+      pending.current.regPass = pw
+      append([{ cls: 'echo', text: `EMAIL: ${pending.current.regEmail}` }, { cls: 'echo', text: 'PASSWORD: ********' }])
+      setMode('register-level')
+      return
+    }
+    if (mode === 'register-level') {
+      const email = pending.current.regEmail
+      const pw = pending.current.regPass
+      const lvl = value.trim()
+      append([{ cls: 'echo', text: `CLEARANCE: ${lvl}` }])
+      setMode('normal')
+      pending.current.regEmail = ''
+      pending.current.regPass = ''
+      const res = await doRegister([email, pw, lvl], ctx())
       append(res)
       return
     }
@@ -246,6 +284,12 @@ export default function App() {
     if (value.trim().toLowerCase() === 'login') {
       append([{ cls: 'echo', text: `${promptText()} login` }])
       setMode('login-email')
+      return
+    }
+    // bare `register` -> guided prompts; `register em pw lvl` still works inline
+    if (value.trim().toLowerCase() === 'register') {
+      append([{ cls: 'echo', text: `${promptText()} register` }])
+      setMode('register-email')
       return
     }
     if (value.trim().toLowerCase() === 'load' || value.trim().toLowerCase() === 'import') {
@@ -363,16 +407,18 @@ export default function App() {
           <input
             autoFocus
             value={input}
-            type={mode === 'login-pass' ? 'password' : 'text'}
+            type={mode === 'login-pass' || mode === 'register-pass' ? 'password' : 'text'}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
           placeholder={
             mode === 'normal'
               ? "access 173  ·  database  ·  create  ·  help"
-              : mode === 'login-email'
+              : mode === 'login-email' || mode === 'register-email'
               ? 'you@company.com'
-              : mode === 'login-pass'
+              : mode === 'login-pass' || mode === 'register-pass'
               ? '••••••••'
+              : mode === 'register-level'
+              ? '1 (PUBLIC) · 2 (CONFIDENTIAL) · 3 (SECRET) · 4 (TOP SECRET)'
               : mode === 'confirm-delete'
               ? "type \"I'm sure\" to confirm, or anything else to cancel"
               : mode === 'wizard' && wizard

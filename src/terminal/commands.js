@@ -52,8 +52,8 @@ const HELP = [
 
   { cls: 'ok', text: '▸ SESSION' },
   { cls: 'sys',  text: '  login [email pw]      authenticate (prompts if no args given)' },
-  { cls: 'sys',  text: '  register <em> <pw> <lvl>  create an operator account (clearance 1-4)' },
-  { cls: 'dim',  text: '      e.g. register me@corp.com hunter2 3' },
+  { cls: 'sys',  text: '  register              create an operator account (guided: email, password, clearance)' },
+  { cls: 'dim',  text: '      or inline: register me@corp.com hunter2 3   (clearance 1-4)' },
   { cls: 'sys',  text: '  logout                end the current session' },
   { cls: 'sys',  text: '  whoami                show current operator + clearance level' },
   { cls: 'dim', text: '' },
