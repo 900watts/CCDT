@@ -5,7 +5,12 @@
 //
 // A line is: { cls, text } | { clear: true } | { cls: 'dossier', data }
 
-import { addDemoArchive, removeDemoArchive } from '../store'
+import {
+  addDemoArchive, removeDemoArchive,
+  demoUsernameTaken, demoRegisterUsername, demoLookupByUsername,
+  demoUsernames, demoMessages,
+  demoAddMessage, demoMarkRead
+} from '../store'
 
 const DEMO_USER = { id: 'demo-agent', email: 'agent@archive.local' }
 
@@ -27,6 +32,43 @@ export function getClearance(ctx) {
   const raw = ctx.user && (ctx.user.clearance_level ?? ctx.user.user_metadata?.clearance_level)
   const lvl = Number(raw)
   return Number.isFinite(lvl) && lvl > 0 ? Math.min(lvl, MAX_CLEARANCE) : 1
+}
+
+// Username validation: 3-32 chars, [a-z0-9_-], case-insensitive stored.
+export function validUsername(u) {
+  const s = String(u || '')
+  return s.length >= 3 && s.length <= 32 && /^[a-z0-9_-]+$/i.test(s)
+}
+
+// Resolve a login input (email or username) -> email. Live mode looks up via
+// peek_user_by_username RPC; DEMO mode uses the in-memory registry.
+export async function resolveLogin(input, ctx) {
+  const raw = String(input || '').trim()
+  if (!raw) return null
+  const looksLikeEmail = raw.includes('@') && raw.indexOf('@') > 0 && raw.indexOf('@') < raw.length - 1
+  if (looksLikeEmail) return raw
+  if (ctx.isConfigured) {
+    const { data, error } = await ctx.supabase.rpc('peek_user_by_username', { p_username: raw })
+    if (error || !data) return null
+    return data.email
+  }
+  const hit = demoLookupByUsername(raw)
+  return hit ? hit.email : null
+}
+
+// Claim a username for the current operator. Returns { ok, taken, reason }.
+export async function claimUsername(username, ctx) {
+  const u = String(username || '').trim()
+  if (!validUsername(u)) return { ok: false, reason: 'invalid_format' }
+  if (ctx.isConfigured) {
+    const { data, error } = await ctx.supabase.rpc('peek_register_username', { p_username: u })
+    if (error) return { ok: false, reason: error.message }
+    if (data?.status === 'taken') return { ok: false, reason: 'taken', username: data.username }
+    return { ok: true, username: data?.username || u.toLowerCase() }
+  }
+  if (demoUsernameTaken(u)) return { ok: false, reason: 'taken' }
+  demoRegisterUsername(ctx.user?.id || DEMO_USER.id, ctx.user?.email || '', u)
+  return { ok: true, username: u.toLowerCase() }
 }
 
 const HELP = [
@@ -61,6 +103,8 @@ const HELP = [
   { cls: 'ok', text: '▸ NAVIGATION' },
   { cls: 'sys',  text: '  database              switch to the visual DATABASE browser' },
   { cls: 'sys',  text: '  terminal              switch back to the terminal' },
+  { cls: 'sys',  text: '  mail [sub]            open the mailbox window (sub: inbox, sent, send)' },
+  { cls: 'dim',  text: '      bare `mail` shows inbox+sent · `mail send` opens the composer · `mail <id>` opens a message' },
   { cls: 'dim', text: '' },
 
   { cls: 'ok', text: '▸ SYSTEM' },
@@ -295,7 +339,11 @@ async function search(args, ctx) {
   return out
 }
 
-export async function doLogin(email, password, ctx) {
+export async function doLogin(emailOrUsername, password, ctx) {
+  if (!emailOrUsername || !password) return [{ cls: 'err', text: 'LOGIN FAILED: need email/username + password' }]
+  const resolved = await resolveLogin(emailOrUsername, ctx)
+  if (!resolved) return [{ cls: 'err', text: `LOGIN FAILED: no user with that email or username` }]
+  const email = resolved
   if (ctx.isConfigured) {
     const { data, error } = await ctx.supabase.auth.signInWithPassword({
       email,
@@ -312,11 +360,16 @@ export async function doLogin(email, password, ctx) {
 }
 
 export async function doRegister(args, ctx) {
-  const [email, password, lvlArg] = args
+  // inline: <email> <password> <lvl> [username]
+  const [email, password, lvlArg, usernameArg] = args
   if (!email || !password || !lvlArg) {
-    return [{ cls: 'warn', text: 'usage: register <email> <password> <clearance 1-4>' }]
+    return [{ cls: 'warn', text: 'usage: register <email> <password> <clearance 1-4> [username]' }]
   }
   const level = Math.max(1, Math.min(MAX_CLEARANCE, parseInt(lvlArg, 10) || 1))
+  const wantsUsername = usernameArg ? String(usernameArg).trim() : ''
+  if (wantsUsername && !validUsername(wantsUsername)) {
+    return [{ cls: 'err', text: `REGISTER FAILED: username "${wantsUsername}" must be 3-32 chars, [a-z0-9_-]` }]
+  }
   if (ctx.isConfigured) {
     // clearance_level is stored in the auth user's metadata; the RLS policy and
     // the access_archive() RPC read it from there.
@@ -327,18 +380,35 @@ export async function doRegister(args, ctx) {
     })
     if (error) return [{ cls: 'err', text: `REGISTER FAILED: ${error.message}` }]
     if (data.session) ctx.setUser(data.user)
-    return [
-      { cls: 'ok', text: `REGISTRATION OK // ${email} (clearance level ${level})` },
-      {
-        cls: 'dim',
-        text: data.session
-          ? 'session established — you may now access archives.'
-          : 'confirm your email, then run: login'
-      }
+    const out = [
+      { cls: 'ok', text: `REGISTRATION OK // ${email} (clearance level ${level})` }
     ]
+    if (wantsUsername && data.session?.user) {
+      const claim = await claimUsername(wantsUsername, ctx)
+      if (!claim.ok) {
+        out.push({ cls: 'err', text: `REGISTER OK but username "${wantsUsername}" is ${claim.reason || 'unavailable'}. claim it later via: mail` })
+      } else {
+        out.push({ cls: 'dim', text: `username claimed: ${claim.username}` })
+      }
+    }
+    out.push({
+      cls: 'dim',
+      text: data.session
+        ? 'session established — you may now access archives.'
+        : 'confirm your email, then run: login'
+    })
+    return out
   }
-  ctx.setUser({ ...DEMO_USER, email, clearance_level: level })
-  return [{ cls: 'ok', text: `REGISTRATION OK (DEMO) // ${email} (clearance level ${level})` }]
+  // DEMO mode
+  if (wantsUsername && demoUsernameTaken(wantsUsername)) {
+    return [{ cls: 'err', text: `REGISTER FAILED: username "${wantsUsername}" is already taken.` }]
+  }
+  const user = { ...DEMO_USER, email, clearance_level: level, username: wantsUsername ? wantsUsername.toLowerCase() : '' }
+  ctx.setUser(user)
+  if (wantsUsername) demoRegisterUsername(user.id, email, wantsUsername)
+  const out = [{ cls: 'ok', text: `REGISTRATION OK (DEMO) // ${email} (clearance level ${level})` }]
+  if (wantsUsername) out.push({ cls: 'dim', text: `username claimed: ${wantsUsername.toLowerCase()}` })
+  return out
 }
 
 export async function doLogout(ctx) {
@@ -476,6 +546,146 @@ export async function importFile(file, ctx) {
   return insertRecord(normalize(raw), ctx)
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// Mailbox — handlers. The actual windows are opened by App via the
+// { openMailbox, openMessageWindow } markers in the returned result.
+// ──────────────────────────────────────────────────────────────────────────
+
+async function getMyUsername(ctx) {
+  if (ctx.isConfigured) {
+    const { data } = await ctx.supabase.from('users').select('username').eq('id', ctx.user.id).maybeSingle()
+    return data?.username || ''
+  }
+  // DEMO: lookup by email (DEMO users share the same placeholder id)
+  const email = ctx.user?.email || ''
+  for (const [un, info] of demoUsernames.entries()) {
+    if (info.email && info.email.toLowerCase() === email.toLowerCase()) return un
+  }
+  return ''
+}
+
+export async function fetchInbox(ctx) {
+  const username = await getMyUsername(ctx)
+  if (!username) return []
+  if (ctx.isConfigured) {
+    const { data, error } = await ctx.supabase.rpc('peek_inbox', { p_username: username })
+    if (error) return []
+    return data || []
+  }
+  return demoMessages
+    .filter((m) => m.recipient && m.recipient.toLowerCase() === username)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+}
+
+export async function fetchSent(ctx) {
+  if (ctx.isConfigured) {
+    const { data, error } = await ctx.supabase.rpc('peek_sent', { p_userid: ctx.user.id })
+    if (error) return []
+    return data || []
+  }
+  return demoMessages
+    .filter((m) => m.sender_id === ctx.user.id)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+}
+
+export async function fetchMessage(id, ctx) {
+  if (ctx.isConfigured) {
+    const username = await getMyUsername(ctx)
+    if (!username) return null
+    const { data, error } = await ctx.supabase.rpc('peek_inbox', { p_username: username })
+    if (error || !data) return null
+    return data.find((m) => m.id === id) || null
+  }
+  return demoMessages.find((m) => m.id === id) || null
+}
+
+export async function doSendMessage({ recipient, subject, body, priority, classification }, ctx) {
+  const r = String(recipient || '').trim().toLowerCase()
+  if (!r) return { ok: false, reason: 'recipient_required' }
+  if (!subject) return { ok: false, reason: 'subject_required' }
+  if (!body) return { ok: false, reason: 'body_required' }
+  const cls = String(classification || 'PUBLIC').toUpperCase()
+  if (!CLASSIFICATIONS.includes(cls)) return { ok: false, reason: 'invalid_classification' }
+  const pri = String(priority || 'normal').toLowerCase()
+  if (!['normal', 'important', 'urgent'].includes(pri)) return { ok: false, reason: 'invalid_priority' }
+
+  if (ctx.isConfigured) {
+    const { data, error } = await ctx.supabase.rpc('peek_send_message', {
+      p_recipient: r, p_subject: subject, p_body: body, p_priority: pri, p_classification: cls
+    })
+    if (error) return { ok: false, reason: error.message }
+    if (data?.status === 'not_found') return { ok: false, reason: `recipient "${r}" does not exist` }
+    if (data?.status === 'denied') return { ok: false, reason: data.reason || 'denied' }
+    return { ok: true, id: data.id, recipient: data.recipient }
+  }
+  // DEMO
+  const hit = demoLookupByUsername(r)
+  if (!hit) return { ok: false, reason: `recipient "${r}" does not exist` }
+  const req = CLEARANCE_LEVEL[cls]
+  if (req > getClearance(ctx)) return { ok: false, reason: `requires level ${req}` }
+  const m = demoAddMessage({
+    sender_id: ctx.user.id,
+    sender_email: ctx.user.email,
+    sender_username: '',
+    recipient: r,
+    subject, body,
+    priority: pri,
+    classification: cls,
+    created_at: new Date().toISOString()
+  })
+  return { ok: true, id: m.id, recipient: r }
+}
+
+export async function doMarkRead(id, ctx) {
+  if (ctx.isConfigured) {
+    const { data, error } = await ctx.supabase.rpc('peek_mark_read', { p_id: id })
+    if (error) return false
+    return data?.status === 'ok'
+  }
+  return demoMarkRead(id)
+}
+
+async function mailCmd(args, ctx) {
+  const guard = authGuard(ctx)
+  if (guard) return guard
+  // No username yet? Prompt to set one (live mode only — DEMO is forgiving).
+  const sub = (args[0] || '').toLowerCase()
+  if (sub === 'send' || sub === 'compose') {
+    return {
+      lines: [
+        { cls: 'ok', text: 'OPENING MAIL COMPOSER…' }
+      ],
+      openCompose: true
+    }
+  }
+  if (sub === 'inbox') {
+    const rows = await fetchInbox(ctx)
+    return [
+      { cls: 'ok', text: `INBOX (${rows.length})` },
+      ...rows.slice(0, 30).map((r) => ({
+        cls: 'sys',
+        text: `  [${r.id.slice(0, 8)}] (${r.classification}) ${r.subject} — from ${r.sender_email || r.sender_username || 'unknown'}${r.read_at ? '' : '  ★'}`
+      }))
+    ]
+  }
+  if (sub === 'sent') {
+    const rows = await fetchSent(ctx)
+    return [
+      { cls: 'ok', text: `SENT (${rows.length})` },
+      ...rows.slice(0, 30).map((r) => ({
+        cls: 'sys',
+        text: `  [${r.id.slice(0, 8)}] (${r.classification}) to ${r.recipient} — ${r.subject}`
+      }))
+    ]
+  }
+  // bare `mail` or `mail <id-prefix>` -> open the inbox window
+  return {
+    lines: [{ cls: 'dim', text: 'opening mailbox…' }],
+    openMailbox: true,
+    openMsgId: args[0] || null
+  }
+}
+
 export async function runCommand(raw, ctx) {
   const input = (raw || '').trim()
   if (!input) return []
@@ -517,12 +727,25 @@ export async function runCommand(raw, ctx) {
       return doDelete(args, ctx)
     case 'logout':
       return doLogout(ctx)
-    case 'whoami':
+    case 'whoami': {
       if (!ctx.user) return [{ cls: 'dim', text: 'not authenticated.' }]
+      let username = ''
+      if (ctx.isConfigured) {
+        const { data } = await ctx.supabase.from('users').select('username').eq('id', ctx.user.id).maybeSingle()
+        username = data?.username || ''
+      } else {
+        for (const [un, info] of demoUsernames.entries()) {
+          if (info.email && info.email.toLowerCase() === ctx.user.email.toLowerCase()) { username = un; break }
+        }
+      }
       return [
         { cls: 'sys', text: `operator: ${ctx.user.email} (${ctx.user.id})` },
-        { cls: 'dim', text: `clearance level: ${getClearance(ctx)}` }
+        { cls: 'dim', text: `clearance level: ${getClearance(ctx)}` },
+        ...(username ? [{ cls: 'dim', text: `username: ${username}` }] : [])
       ]
+    }
+    case 'mail':
+      return await mailCmd(args, ctx)
     case 'about':
       return [
         { cls: 'ok', text: 'CCDT — CORPORATE CENTRAL DATA TERMINAL' },

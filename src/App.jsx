@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { supabase, isConfigured } from './supabaseClient'
-import { runCommand, doLogin, doRegister, doDeleteConfirm, CREATE_FIELDS, finalizeCreate, importFile } from './terminal/commands'
+import { runCommand, doLogin, doRegister, doDeleteConfirm, fetchMessage, doMarkRead, CREATE_FIELDS, finalizeCreate, importFile } from './terminal/commands'
 import { demoStore } from './store'
 import { openDossierWindow } from './dossierWindow'
+import { openInboxWindow, openComposeWindow, openMessageWindow } from './mailboxWindow'
 import DatabaseView from './DatabaseView'
 
 const CLASS_COLOR = {
@@ -128,6 +129,7 @@ export default function App() {
     if (mode === 'register-email') return 'EMAIL:'
     if (mode === 'register-pass') return 'PASSWORD:'
     if (mode === 'register-level') return 'CLEARANCE [1-4]:'
+    if (mode === 'register-username') return 'USERNAME:'
     if (mode === 'confirm-delete') return 'CONFIRM>'
     const name = user ? (user.email || 'admin').split('@')[0] : 'guest'
     return `${name}@CCDT:~$`
@@ -190,10 +192,55 @@ export default function App() {
       const pw = pending.current.regPass
       const lvl = value.trim()
       append([{ cls: 'echo', text: `CLEARANCE: ${lvl}` }])
+      pending.current.regPass = ''
+      // In live mode, ask for username next (so we can check uniqueness before
+      // creating the auth user). DEMO mode skips this and finalises immediately.
+      if (isConfigured) {
+        pending.current.regLvl = lvl
+        pending.current.regEmail = email
+        pending.current.regPw = pw
+        setMode('register-username')
+        return
+      }
       setMode('normal')
       pending.current.regEmail = ''
-      pending.current.regPass = ''
       const res = await doRegister([email, pw, lvl], ctx())
+      append(res)
+      return
+    }
+    if (mode === 'register-username') {
+      const { regEmail: email, regPw: pw, regLvl: lvl } = pending.current
+      const uname = value.trim()
+      // peek_username_taken — runs in live mode only
+      const { data: takenData } = await supabase.rpc('peek_username_taken', { p_username: uname })
+      const taken = !!takenData
+      if (!uname) {
+        append([{ cls: 'err', text: 'USERNAME REQUIRED (or "skip")' }])
+        return
+      }
+      if (uname.toLowerCase() === 'skip') {
+        setMode('normal')
+        pending.current.regEmail = ''
+        pending.current.regPw = ''
+        pending.current.regLvl = ''
+        const res = await doRegister([email, pw, lvl], ctx())
+        append(res)
+        return
+      }
+      if (!/^[a-z0-9_-]{3,32}$/i.test(uname)) {
+        append([{ cls: 'err', text: 'INVALID USERNAME — 3-32 chars, [a-z0-9_-] only' }])
+        return
+      }
+      if (taken) {
+        append([{ cls: 'err', text: `USERNAME "${uname}" ALREADY TAKEN — choose another (or "skip")` }])
+        return
+      }
+      // Username is unique — proceed.
+      setMode('normal')
+      pending.current.regEmail = ''
+      pending.current.regPw = ''
+      pending.current.regLvl = ''
+      const res = await doRegister([email, pw, lvl, uname], ctx())
       append(res)
       return
     }
@@ -333,6 +380,25 @@ export default function App() {
       setPendingDelete(res.confirmDelete)
       setMode('confirm-delete')
     }
+
+    // mail — spawn the mailbox / compose / single-message window
+    if (!Array.isArray(res)) {
+      const liveCtx = ctx()
+      if (res.openCompose) openComposeWindow(liveCtx)
+      if (res.openMailbox) {
+        if (res.openMsgId) {
+          const m = await fetchMessage(res.openMsgId, liveCtx)
+          if (m) {
+            await doMarkRead(res.openMsgId, liveCtx)
+            openMessageWindow(m, liveCtx)
+          } else {
+            append([{ cls: 'err', text: `MESSAGE ${res.openMsgId} NOT FOUND / NOT VISIBLE` }])
+          }
+        } else {
+          openInboxWindow(liveCtx, (m) => openMessageWindow(m, liveCtx))
+        }
+      }
+    }
   }
 
   const onFile = async (e) => {
@@ -414,11 +480,13 @@ export default function App() {
             mode === 'normal'
               ? "access 173  ·  database  ·  create  ·  help"
               : mode === 'login-email' || mode === 'register-email'
-              ? 'you@company.com'
+              ? 'email (or username if you have one)'
               : mode === 'login-pass' || mode === 'register-pass'
               ? '••••••••'
               : mode === 'register-level'
               ? '1 (PUBLIC) · 2 (CONFIDENTIAL) · 3 (SECRET) · 4 (TOP SECRET)'
+              : mode === 'register-username'
+              ? '3-32 chars [a-z0-9_-] — or "skip" to leave empty'
               : mode === 'confirm-delete'
               ? "type \"I'm sure\" to confirm, or anything else to cancel"
               : mode === 'wizard' && wizard

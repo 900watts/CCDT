@@ -1,8 +1,11 @@
 // Mutable demo store. When Supabase is not configured, created/loaded
-// documents live here so `list` / `access` can show them during a session.
+// documents, usernames, and messages live here so the terminal can demonstrate
+// the full flow without a backend.
 import { DEMO_ARCHIVES } from './demoData'
 
 export const demoStore = [...DEMO_ARCHIVES]
+export const demoUsernames = new Map() // lowercase username -> { email, id }
+export const demoMessages = [] // { id, sender_id, sender_email, recipient, subject, body, priority, classification, read_at, created_at }
 
 export function addDemoArchive(a) {
   demoStore.push(a)
@@ -13,4 +16,40 @@ export function removeDemoArchive(num) {
   const i = demoStore.findIndex((a) => a.archive_number === String(num))
   if (i >= 0) demoStore.splice(i, 1)
   return i >= 0
+}
+
+export function demoUsernameTaken(username) {
+  return demoUsernames.has(String(username).toLowerCase())
+}
+
+export function demoRegisterUsername(userId, email, username) {
+  demoUsernames.set(String(username).toLowerCase(), { email, id: userId })
+  return true
+}
+
+export function demoLookupByUsername(username) {
+  return demoUsernames.get(String(username).toLowerCase()) || null
+}
+
+export function demoEmailToId(email) {
+  for (const [un, info] of demoUsernames.entries()) {
+    if (info.email.toLowerCase() === String(email).toLowerCase()) return info.id
+  }
+  return null
+}
+
+let nextDemoMsgId = 1
+export function demoAddMessage(m) {
+  const row = { id: `demo-msg-${nextDemoMsgId++}`, read_at: null, ...m }
+  demoMessages.push(row)
+  return row
+}
+
+export function demoMarkRead(msgId) {
+  const m = demoMessages.find((x) => x.id === msgId)
+  if (m && !m.read_at) {
+    m.read_at = new Date().toISOString()
+    return true
+  }
+  return false
 }
