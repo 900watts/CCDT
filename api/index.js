@@ -254,7 +254,14 @@ export default async function handler(request) {
 
 async function route(request) {
   const url = new URL(request.url)
-  const path = url.pathname.replace(/\/+$/, '') || '/'
+  let path = url.pathname.replace(/\/+$/, '') || '/'
+  // Strip an /api prefix so a rewrite from /llms.txt → /api/llms.txt
+  // (or /api/index?path=llms.txt) lands at the same internal route.
+  if (path.startsWith('/api/')) path = path.slice(4) || '/'
+  // Also accept ?path=… as an alternative when Vercel rewrites
+  // with a query string.
+  const qsPath = url.searchParams.get('path')
+  if (qsPath) path = qsPath
   const authHeader = request.headers.get('authorization') || ''
   const m = /^Bearer\s+(.+)$/i.exec(authHeader)
   const jwt = m ? m[1] : null
@@ -263,6 +270,62 @@ async function route(request) {
   const clearance = user ? clearanceFromUser(user) : 1
 
   // ---- public read endpoints (no auth required) ----
+
+  // Root discovery: /api/  and  /  both return the agent card.
+  if (path === '/' || path === '' || path === '/api') {
+    // fall through to the /api/agent.json handler below
+    const { data: pub } = await sb.from('archives').select('id').eq('classification', 'PUBLIC')
+    const { data: all } = await sb.from('archives').select('id,updated_at,created_at')
+    const latest = (all || [])
+      .map(r => r.updated_at || r.created_at).filter(Boolean).sort().slice(-1)[0] || null
+    return jsonResponse({
+      name: 'CCDT — Corporate Central Data Terminal',
+      short_name: 'CCDT',
+      url: SITE_URL,
+      description: 'A live corporate archive readable by AI agents. PUBLIC records are open; ' +
+                   'CONFIDENTIAL/SECRET/TOP SECRET records require a Bearer token (RLS-gated by clearance).',
+      operator: '900watts',
+      last_updated: latest,
+      generated_at: new Date().toISOString(),
+      public_archive_count: pub?.length ?? 0,
+      rls_visible_to_you: all?.length ?? 0,
+      your_clearance: clearance,
+      endpoints: {
+        public: {
+          llms_txt:        '/llms.txt',
+          llms_full_txt:   '/llms-full.txt',
+          agent_card:      '/api/agent.json',
+          archives_json:   '/api/archives.json',
+          archive_json:    '/api/archives/{n}.json',
+          archive_md:      '/api/archives/{n}.md',
+          archive_html:    '/api/archives/{n}.html',
+          sitemap:         '/sitemap.xml'
+        },
+        auth_optional: {
+          me:              '/api/me',
+          archives_all:    '/api/archives.all.json',
+          archive_full:    '/api/archives/{n}.full.json'
+        },
+        auth_required: {
+          register:        'POST /api/auth/register',
+          login:           'POST /api/auth/login',
+          mail_inbox:      'GET  /api/mail/inbox',
+          mail_sent:       'GET  /api/mail/sent',
+          mail_read:       'GET  /api/mail/{id}.json',
+          mail_send:       'POST /api/mail/send',
+          archive_create:  'POST /api/archives',
+          archive_update:  'PATCH /api/archives/{n}',
+          archive_delete:  'DELETE /api/archives/{n}'
+        }
+      },
+      auth: {
+        type: 'bearer',
+        description: 'Pass a Supabase access JWT (the same one the SPA uses) as `Authorization: Bearer <token>`.',
+        how_to_login:  'POST /api/auth/login with { email|username, password }',
+        how_to_register: 'POST /api/auth/register with { email, password, clearance_level, username? }'
+      }
+    })
+  }
 
   if (path === '/llms.txt') {
     const { data } = await sb.from('archives').select('id').eq('classification', 'PUBLIC')

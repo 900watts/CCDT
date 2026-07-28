@@ -3,14 +3,14 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/llms.txt",       "destination": "/api/llms.txt" },
-    { "source": "/llms-full.txt",  "destination": "/api/llms-full.txt" },
-    { "source": "/sitemap.xml",    "destination": "/api/sitemap.xml" },
+    { "source": "/llms.txt",       "destination": "/api/index?path=llms.txt" },
+    { "source": "/llms-full.txt",  "destination": "/api/index?path=llms-full.txt" },
+    { "source": "/sitemap.xml",    "destination": "/api/index?path=sitemap.xml" },
     { "source": "/(.*)",           "destination": "/index.html" }
   ],
   "headers": [
     {
-      "source": "/(llms\\.txt|llms-full\\.txt|api/.*|sitemap\\.xml)",
+      "source": "/(api/.*|llms\\.txt|llms-full\\.txt|sitemap\\.xml)",
       "headers": [
         { "key": "Access-Control-Allow-Origin",  "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PATCH, DELETE, OPTIONS" },
