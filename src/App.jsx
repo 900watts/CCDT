@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { supabase, isConfigured } from './supabaseClient'
-import { runCommand, doLogin, doRegister, doDeleteConfirm, fetchMessage, doMarkRead, CREATE_FIELDS, finalizeCreate, importFile } from './terminal/commands'
+import { runCommand, doLogin, doRegister, doDeleteConfirm, fetchMessage, doMarkRead, CREATE_FIELDS, finalizeCreate, importFile, getClearance } from './terminal/commands'
 import { demoStore } from './store'
 import { openDossierWindow } from './dossierWindow'
 import { openEditorWindow } from './editorWindow'
@@ -384,7 +384,8 @@ export default function App() {
     // "window" lines spawn a draggable viewer (WinBox); they are not printed.
     const windows = arr.filter((l) => l.cls === 'window')
     const printable = arr.filter((l) => l.cls !== 'window' && !l.clear)
-    windows.forEach((w) => openDossierWindow(w.data))
+    const operatorClearance = getClearance(ctx())
+    windows.forEach((w) => openDossierWindow(w.data, { operatorClearance }))
     if (printable.length) append(printable)
 
     // wizard (create) — start guided multi-step flow

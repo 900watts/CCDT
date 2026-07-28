@@ -140,7 +140,7 @@ export function openEditorWindow(ctx, prefill = {}, onSaved) {
       } else {
         $('#ccdt-e-content').style.display = 'block'
         $('#ccdt-e-toolbar').style.display = 'flex'
-        $('#ccdt-e-drop').style.display = 'flex'
+        $('#ccdt-e-drop').style.display = 'none'  // hidden by default; only visible during a real drag
         $('#ccdt-e-preview').style.display = 'none'
       }
     })
@@ -232,20 +232,34 @@ export function openEditorWindow(ctx, prefill = {}, onSaved) {
     e.target.value = ''
   })
 
-  // Drag-drop
+  // Drag-drop — counter pattern so the overlay only stays visible while a
+// drag is actively inside the body (not its child elements).
   const body = $('#ccdt-e-body')
+  let dragDepth = 0
   const showDrop = (yes) => { $('#ccdt-e-drop').style.display = yes ? 'flex' : 'none' }
-  body.addEventListener('dragenter', (e) => { e.preventDefault(); showDrop(true) })
-  body.addEventListener('dragover', (e) => { e.preventDefault() })
-  body.addEventListener('dragleave', (e) => {
-    if (e.target === body || e.target === $('#ccdt-e-drop')) showDrop(false)
+  body.addEventListener('dragenter', (e) => {
+    if (!Array.from(e.dataTransfer?.types || []).includes('Files')) return
+    e.preventDefault()
+    dragDepth++
+    showDrop(true)
+  })
+  body.addEventListener('dragover', (e) => {
+    if (!Array.from(e.dataTransfer?.types || []).includes('Files')) return
+    e.preventDefault()
+  })
+  body.addEventListener('dragleave', () => {
+    dragDepth = Math.max(0, dragDepth - 1)
+    if (dragDepth === 0) showDrop(false)
   })
   body.addEventListener('drop', async (e) => {
     e.preventDefault()
+    dragDepth = 0
     showDrop(false)
     const files = Array.from(e.dataTransfer?.files || [])
     for (const f of files) if (f.type.startsWith('image/')) await addPhoto(f)
   })
+  // Safety net: if the drag ends anywhere (or is cancelled), hide.
+  document.addEventListener('dragend', () => { dragDepth = 0; showDrop(false) })
 
   // Save / Cancel
   $('#ccdt-e-save').addEventListener('click', async () => {

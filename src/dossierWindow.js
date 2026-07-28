@@ -11,6 +11,18 @@ const CLASS_COLOR = {
   PUBLIC: '#38ff9a'
 }
 
+// Same map the SQL function `public.required_clearance(text)` uses.
+const CLASS_LEVEL = {
+  PUBLIC: 1,
+  CONFIDENTIAL: 2,
+  SECRET: 3,
+  'TOP SECRET': 4
+}
+
+function requiredLevel(cls) {
+  return CLASS_LEVEL[String(cls || 'PUBLIC').toUpperCase()] || 1
+}
+
 function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;')
@@ -19,7 +31,7 @@ function esc(s) {
     .replace(/"/g, '&quot;')
 }
 
-export function openDossierWindow(row) {
+export function openDossierWindow(row, opts = {}) {
   if (!row) return null
   const cls = (row.classification || 'PUBLIC').toUpperCase()
   const color = CLASS_COLOR[cls] || '#38ff9a'
@@ -42,10 +54,17 @@ export function openDossierWindow(row) {
         .join('')}</div>`
     : ''
 
+  const need = requiredLevel(cls)
+  const have = Number(opts.operatorClearance) || 0
+  const sufficient = have >= need
+  const clearanceNote = sufficient
+    ? `requires clearance ${need} · you have ${have}`
+    : `requires clearance ${need} · you have ${have} — ACCESS DENIED`
+
   const html = `
     <div class="ccdt-dossier">
       <div class="ccdt-dossier__banner" style="color:${color};border-color:${color}">
-        ${esc(cls)} — CLEARANCE REQUIRED
+        ${esc(cls)} — ${esc(clearanceNote)}
       </div>
       <div class="ccdt-dossier__num">ARCHIVE ${esc(row.archive_number)}</div>
       <div class="ccdt-dossier__title">${esc(row.title)}</div>
