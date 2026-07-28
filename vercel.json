@@ -1,14 +1,13 @@
 {
-  "version": 2,
   "builds": [
     { "src": "api/index.js", "use": "@vercel/node" },
     { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } }
   ],
   "rewrites": [
-    { "source": "/llms.txt",       "dest": "/api/index.js" },
-    { "source": "/llms-full.txt",  "dest": "/api/index.js" },
-    { "source": "/sitemap.xml",    "dest": "/api/index.js" },
-    { "source": "/(.*)",           "dest": "/index.html" }
+    { "source": "/llms.txt",       "destination": "/api/index" },
+    { "source": "/llms-full.txt",  "destination": "/api/index" },
+    { "source": "/sitemap.xml",    "destination": "/api/index" },
+    { "source": "/(.*)",           "destination": "/index.html" }
   ],
   "headers": [
     {
