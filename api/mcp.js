@@ -625,9 +625,9 @@ export default async function handler(request) {
 
 // Pin to the Node.js runtime: the MCP SDK pulls in some node:* modules
 // (e.g. node:stream in the transport) and the Vercel edge runtime would
-// fail with 500s otherwise. Node 20 is fine; the SDK requires >= 18.
+// fail with 500s otherwise.
 export const config = {
-  runtime: 'nodejs20.x',
+  runtime: 'nodejs',
   regions: ['iad1'],
   maxDuration: 60
 }
