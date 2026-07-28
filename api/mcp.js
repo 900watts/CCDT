@@ -622,3 +622,12 @@ export default async function handler(request) {
   const session = await getOrCreateSession(request, ctx)
   return session.transport.handleRequest(request)
 }
+
+// Pin to the Node.js runtime: the MCP SDK pulls in some node:* modules
+// (e.g. node:stream in the transport) and the Vercel edge runtime would
+// fail with 500s otherwise. Node 20 is fine; the SDK requires >= 18.
+export const config = {
+  runtime: 'nodejs20.x',
+  regions: ['iad1'],
+  maxDuration: 60
+}
