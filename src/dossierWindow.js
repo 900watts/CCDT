@@ -55,11 +55,14 @@ export function openDossierWindow(row, opts = {}) {
     : ''
 
   const need = requiredLevel(cls)
-  const have = Number(opts.operatorClearance) || 0
-  const sufficient = have >= need
-  const clearanceNote = sufficient
-    ? `requires clearance ${need} · you have ${have}`
-    : `requires clearance ${need} · you have ${have} — ACCESS DENIED`
+  const have = Number(opts.operatorClearance)
+  const haveKnown = Number.isFinite(have) && have > 0
+  const sufficient = haveKnown && have >= need
+  const clearanceNote = haveKnown
+    ? (sufficient
+        ? `requires clearance ${need} · you have ${have}`
+        : `requires clearance ${need} · you have ${have} — ACCESS DENIED`)
+    : `requires clearance ${need} · your clearance is unknown — sign in again`
 
   const html = `
     <div class="ccdt-dossier">

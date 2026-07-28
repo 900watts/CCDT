@@ -29,7 +29,15 @@ function requiredLevel(rec) {
 
 // The operator's current clearance level (defaults to 1 / PUBLIC when unset).
 export function getClearance(ctx) {
-  const raw = ctx.user && (ctx.user.clearance_level ?? ctx.user.user_metadata?.clearance_level)
+  if (!ctx || !ctx.user) return 1
+  const u = ctx.user
+  // Supabase stores signUp({ options: { data } }) into user_metadata, but
+  // auth.admin.createUser and some flows write to app_metadata. Probe both
+  // plus the rare top-level placement, in priority order.
+  const raw =
+    u.clearance_level ??
+    u.user_metadata?.clearance_level ??
+    u.app_metadata?.clearance_level
   const lvl = Number(raw)
   return Number.isFinite(lvl) && lvl > 0 ? Math.min(lvl, MAX_CLEARANCE) : 1
 }

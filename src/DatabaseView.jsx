@@ -39,7 +39,7 @@ export default function DatabaseView({ user }) {
   const open = async (num) => {
     const res = await fetchOne(num, ctx())
     if (res.ok) {
-      openDossierWindow(res.data)
+      openDossierWindow(res.data, { operatorClearance: getClearance(ctx()) })
     } else if (res.reason === 'not_found') {
       setError(`ARCHIVE ${num} NOT FOUND`)
     } else if (res.reason === 'denied') {
