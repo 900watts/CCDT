@@ -597,42 +597,53 @@ function authOrError(req) {
 }
 
 export default async function handler(request) {
-  // CORS preflight
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders() })
-  }
-
-  const url = new URL(request.url)
-
-  // Discovery
-  if (request.method === 'GET' && (url.pathname === '/api/mcp' || url.pathname === '/api/mcp/')) {
-    return jsonResponse(SERVER_CARD)
-  }
-  if (url.pathname === '/api/mcp/health' || url.pathname === '/api/mcp/health/') {
-    return jsonResponse({
-      ok: true,
-      configured: IS_CONFIGURED,
-      supabase_url: SUPABASE_URL ? SUPABASE_URL.replace(/\/\/.+@/, '//***@') : null,
-      time: new Date().toISOString()
-    })
-  }
-
-  // MCP transport
-  if (!IS_CONFIGURED) {
-    return jsonResponse({ error: 'server_misconfigured',
-      message: 'VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set on this Vercel project.' }, 503)
-  }
-  const a = authOrError(request)
-  if (!a.ok) return a.res
-  const ctx = await buildCtx(a.jwt)
-  if (!ctx.ok) {
-    return jsonResponse({ error: 'auth_failed', message: ctx.reason }, 401)
-  }
-  const session = await getOrCreateSession(request, ctx, await getSdk())
   try {
-    return await session.transport.handleRequest(request)
+    // CORS preflight
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: corsHeaders() })
+    }
+
+    const url = new URL(request.url)
+
+    // Discovery
+    if (request.method === 'GET' && (url.pathname === '/api/mcp' || url.pathname === '/api/mcp/')) {
+      return jsonResponse(SERVER_CARD)
+    }
+    if (url.pathname === '/api/mcp/health' || url.pathname === '/api/mcp/health/') {
+      return jsonResponse({
+        ok: true,
+        configured: IS_CONFIGURED,
+        supabase_url: SUPABASE_URL ? SUPABASE_URL.replace(/\/\/.+@/, '//***@') : null,
+        time: new Date().toISOString()
+      })
+    }
+
+    // MCP transport
+    if (!IS_CONFIGURED) {
+      return jsonResponse({ error: 'server_misconfigured',
+        message: 'VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set on this Vercel project.' }, 503)
+    }
+    const a = authOrError(request)
+    if (!a.ok) return a.res
+    const ctx = await buildCtx(a.jwt)
+    if (!ctx.ok) {
+      return jsonResponse({ error: 'auth_failed', message: ctx.reason }, 401)
+    }
+    const session = await getOrCreateSession(request, ctx, await getSdk())
+    try {
+      return await session.transport.handleRequest(request)
+    } catch (e) {
+      return jsonResponse({ error: 'mcp_transport_failed',
+        message: String(e?.message || e),
+        stack: String(e?.stack || '').slice(0, 2000)
+      }, 500)
+    }
   } catch (e) {
-    return jsonResponse({ error: 'mcp_transport_failed', message: String(e?.message || e) }, 500)
+    return jsonResponse({
+      error: 'internal_error',
+      message: String(e?.message || e),
+      stack: String(e?.stack || '').slice(0, 2000)
+    }, 500)
   }
 }
 
