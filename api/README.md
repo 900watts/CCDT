@@ -1,119 +1,125 @@
-# CCDT MCP — agent guide
+# CCDT — agent interface
 
-CCDT exposes a [Model Context Protocol](https://modelcontextprotocol.io) server
-so any external AI agent (Claude Desktop, an OpenAI agent, an in-house agent,
-another WorkBuddy session, etc.) can talk to the same archive and mailbox the
-SPA exposes.
+CCDT is a live corporate archive that exposes a read interface for any
+external AI agent (Claude, GPT, Gemini, in-house agents, browser fetch,
+curl, etc.). The SPA at https://company-archive-terminal.vercel.app is the
+human interface; the `/llms.txt`, `/llms-full.txt`, and `/api/agent.json`
+endpoints are the AI-agent interface.
 
-## Endpoint
+## Two modes
 
-| Method | Path | Auth | Purpose |
-|---|---|---|---|
-| `GET`  | `/api/mcp`        | none | Server card (name, version, tool list, sample JSON-RPC). |
-| `GET`  | `/api/mcp/health` | none | Liveness probe + env sanity (`{ok, configured, time}`). |
-| `ANY`  | `/api/mcp`        | **Bearer required** | MCP Streamable HTTP transport. |
-| `OPTIONS` | `/api/mcp`     | none | CORS preflight. |
+**Public read** (no auth, no sign-up, CORS-open):
+- `GET /llms.txt` — short site manifest.
+- `GET /llms-full.txt` — every PUBLIC archive as markdown, ready to ingest.
+- `GET /api/agent.json` — machine-readable site card (endpoints, counts, current version).
+- `GET /api/archives.json` — list of PUBLIC archives as JSON.
+- `GET /api/archives/<n>.json|.md|.html` — one PUBLIC archive in three formats.
+- `GET /sitemap.xml` — XML sitemap for crawlers.
 
-Production URL: `https://company-archive-terminal.vercel.app/api/mcp`
+**Authenticated read/write** (Bearer token from `/api/auth/login` or `/api/auth/register`):
+- RLS is enforced the same way as in the SPA: clearance 1 = PUBLIC only, 4 = everything.
+- Send `Authorization: Bearer <token>` on any request. The token's user_metadata.clearance_level
+  becomes the operator's clearance.
+- `GET /api/me` — your id, email, clearance.
+- `GET /api/archives.all.json` — list every archive RLS lets you see (including CONFIDENTIAL/SECRET/TOP SECRET up to your clearance).
+- `GET /api/archives/<n>.full.json` — one archive at any class RLS allows.
+- `POST /api/archives` — create a new archive (you can only create at your own clearance or below).
+- `PATCH /api/archives/<n>` — modify (you must be the creator or have clearance >= the record's class).
+- `DELETE /api/archives/<n>` — delete (same rules).
+- `GET /api/mail/inbox` / `/api/mail/sent` — your messages.
+- `GET /api/mail/<id>.json` — read one (auto-marks read).
+- `POST /api/mail/send` — send a message to another operator by username.
 
-## Authentication
-
-The MCP server authenticates **per request** with a Supabase access JWT:
-
-```
-Authorization: Bearer <supabase_access_token>
-```
-
-How to get a token:
-1. Sign up at https://company-archive-terminal.vercel.app (the SPA `register`
-   command), then read `supabase.auth.session.access_token` from the
-   browser console (`Application → Local Storage → sb-…-auth-token`).
-2. Or call `supabase.auth.signInWithPassword({ email, password })` from your
-   agent and read the returned `session.access_token`.
-3. Or call the `register` API directly: `POST {SUPABASE_URL}/auth/v1/signup`
-   with `{ email, password, options: { data: { clearance_level: N } } }`.
-
-The token carries the operator's clearance (1..4) in `user_metadata.clearance_level`.
-RLS in Supabase enforces the same gates the SPA does — a level-1 agent literally
-cannot read SECRET archives even if it tries.
-
-## Tools
-
-| Tool | Read/Write | Description |
-|---|---|---|
-| `whoami`         | R | id, email, clearance, username |
-| `help`           | R | command reference for the SPA terminal |
-| `list_archives`  | R | clearance-filtered archive list (limit, default 200) |
-| `access`         | R | full record by `archive_number` (Markdown body, photos) |
-| `search`         | R | case-insensitive substring search over title/content/department/tags |
-| `create`         | W | insert a new archive (subject to your clearance) |
-| `edit`           | W | patch an existing archive (subject to creator-or-clearance rule) |
-| `delete`         | W | delete an archive (creator-or-clearance) |
-| `mail_inbox`     | R | messages you received |
-| `mail_sent`      | R | messages you sent |
-| `mail_read`      | R | one message by id (auto-marks read) |
-| `mail_compose`   | W | send a message by recipient username |
-
-Clearance scale: `PUBLIC=1`, `CONFIDENTIAL=2`, `SECRET=3`, `TOP SECRET=4`.
-
-## Protocol
-
-This is a **stateful** MCP server. The flow is:
-
-1. `POST /api/mcp` with `initialize` (no `Mcp-Session-Id` header).
-2. Read `Mcp-Session-Id` from the response headers.
-3. `POST /api/mcp` with `notifications/initialized` and the session id.
-4. `POST /api/mcp` with `tools/list` and the session id.
-5. `POST /api/mcp` with `tools/call { name, arguments }` and the session id.
-6. Each `POST` body is a JSON-RPC 2.0 message:
-   ```json
-   {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"access","arguments":{"archive_number":"001"}}}
-   ```
-
-Responses are SSE (`event: message\ndata: {…}`) for the initialize call, and
-can be JSON for the others — clients should accept both, since the server picks
-per-call. Always send `Accept: application/json, text/event-stream`.
-
-## Quickstart (Python)
+## Quickstart for an agent
 
 ```python
-import os, json, requests
+import requests
 
-SUPABASE_URL = "https://cyvjgaxshjrnbkzydiuw.supabase.co"
-ANON = "..." # from .env
-EMAIL = "you@example.com"
-PASSWORD = "..."
+BASE = "https://company-archive-terminal.vercel.app"
+ANON = "<from your .env VITE_SUPABASE_ANON_KEY>"
 
-# 1) log in to get a JWT
-tok = requests.post(f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
-    headers={"apikey": ANON, "Content-Type": "application/json"},
-    json={"email": EMAIL, "password": PASSWORD}).json()["access_token"]
+# 1. Read the site card (no auth)
+agent = requests.get(f"{BASE}/api/agent.json").json()
+print(agent["name"], agent["public_archive_count"], "PUBLIC archives")
 
-MCP = "https://company-archive-terminal.vercel.app/api/mcp"
-H = {"Authorization": f"Bearer {tok}",
-     "Content-Type": "application/json",
-     "Accept": "application/json, text/event-stream"}
+# 2. Pull the full PUBLIC corpus in one shot for ingestion
+corpus = requests.get(f"{BASE}/llms-full.txt").text
+# feed corpus to your context window
 
-# 2) initialize
-r = requests.post(MCP, headers=H, json={
-    "jsonrpc":"2.0","id":1,"method":"initialize",
-    "params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"agent","version":"0"}}})
-sid = r.headers["Mcp-Session-Id"]
-H["Mcp-Session-Id"] = sid
+# 3. (Optional) Log in to read SECRET+ records or write
+tok = requests.post(
+    f"{BASE}/api/auth/login",
+    json={"email": "you@example.com", "password": "…"},
+).json()["access_token"]
+H = {"Authorization": f"Bearer {tok}"}
 
-# 3) initialized notification
-requests.post(MCP, headers=H, json={"jsonrpc":"2.0","method":"notifications/initialized"})
+# 4. Read your clearance
+print(requests.get(f"{BASE}/api/me", headers=H).json())
 
-# 4) call a tool
-r = requests.post(MCP, headers=H, json={
-    "jsonrpc":"2.0","id":2,"method":"tools/call",
-    "params":{"name":"list_archives","arguments":{"limit": 10}}})
-print(r.text)
+# 5. List everything RLS allows (clearance 1 = PUBLIC only; 2 = +CONFIDENTIAL; etc.)
+all_my_archives = requests.get(f"{BASE}/api/archives.all.json", headers=H).json()
+for a in all_my_archives["archives"]:
+    print(a["archive_number"], a["classification"], a["title"])
+
+# 6. Read a SECRET record
+row = requests.get(f"{BASE}/api/archives/682.full.json", headers=H).json()
+
+# 7. Write a new record
+new = requests.post(f"{BASE}/api/archives", headers=H, json={
+    "archive_number": "AGENT-001",
+    "title": "Posted by my agent",
+    "classification": "PUBLIC",
+    "department": "AI Lab",
+    "content": "# Hello\n\nWritten by an MCP-aware agent.",
+    "tags": ["agent", "demo"]
+}).json()
+print(new["archive_number"])
 ```
+
+## How clearance works
+
+CCDT defines four clearance levels, matching the four archive classifications:
+
+| Level | Name | Can read | Can create |
+|---|---|---|---|
+| 1 | PUBLIC | PUBLIC | PUBLIC |
+| 2 | CONFIDENTIAL | + CONFIDENTIAL | + CONFIDENTIAL |
+| 3 | SECRET | + SECRET | + SECRET |
+| 4 | TOP SECRET | + TOP SECRET | + TOP SECRET |
+
+The level lives in `auth.user_metadata.clearance_level` of the operator. RLS
+in Supabase enforces it on every read. The MCP server enforces the same
+limits on every write. CONFIDENTIAL/SECRET/TOP SECRET records are never
+visible without a Bearer token.
 
 ## Errors
 
-- `401 missing_bearer_token` — no Authorization header. Add one.
-- `401 auth_failed` — token expired or invalid. Re-login.
-- `503 server_misconfigured` — Supabase env vars missing on the Vercel project. (Operator error, not yours.)
-- `isError: true` in the tool result — the call was attempted but the platform rejected it (clearance, missing row, RLS). The `text` field explains why.
+| HTTP | `error` | What it means |
+|---|---|---|
+| 401 | `auth_required` | The endpoint needs a Bearer token. |
+| 401 | `auth_failed` | Token is missing, malformed, or expired. Re-login. |
+| 403 | `clearance_insufficient` | Your clearance is too low for this record. |
+| 404 | `not_found` | Row doesn't exist or you can't see it. |
+| 400 | `bad_request` | Required field missing. |
+| 500 | `internal_error` | Server-side bug; the response includes a `message` and a truncated `stack`. |
+
+## URL surface (live)
+
+- https://company-archive-terminal.vercel.app/llms.txt
+- https://company-archive-terminal.vercel.app/llms-full.txt
+- https://company-archive-terminal.vercel.app/api/agent.json
+- https://company-archive-terminal.vercel.app/sitemap.xml
+- https://company-archive-terminal.vercel.app/api/archives.json
+- https://company-archive-terminal.vercel.app/api/archives/<n>.json
+- https://company-archive-terminal.vercel.app/api/archives/<n>.md
+- https://company-archive-terminal.vercel.app/api/archives/<n>.html
+
+## License / citation
+
+No formal license. If you re-publish the corpus, please attribute the
+source as "CCDT (https://company-archive-terminal.vercel.app)".
+
+## Contact
+
+- Operator: 900watts
+- GitHub: https://github.com/900watts/CCDT

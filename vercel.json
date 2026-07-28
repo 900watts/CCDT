@@ -3,17 +3,19 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/api/mcp", "destination": "/api/mcp" },
-    { "source": "/api/mcp/(.*)", "destination": "/api/mcp" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/llms.txt",       "destination": "/llms.txt" },
+    { "source": "/llms-full.txt",  "destination": "/llms-full.txt" },
+    { "source": "/sitemap.xml",    "destination": "/sitemap.xml" },
+    { "source": "/api/(.*)",       "destination": "/api/$1" },
+    { "source": "/(.*)",           "destination": "/index.html" }
   ],
   "headers": [
     {
-      "source": "/api/mcp",
+      "source": "/(llms\\.txt|llms-full\\.txt|api/.*|sitemap\\.xml)",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, DELETE, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, Mcp-Session-Id, Last-Event-Id" }
+        { "key": "Access-Control-Allow-Origin",  "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, User-Agent" }
       ]
     }
   ]
