@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { supabase, isConfigured } from './supabaseClient'
-import { runCommand, doLogin, doRegister, doDeleteConfirm, fetchMessage, doMarkRead, CREATE_FIELDS, finalizeCreate, importFile, getClearance } from './terminal/commands'
+import { runCommand, doLogin, doRegister, doDeleteConfirm, fetchMessage, fetchInbox, doMarkRead, CREATE_FIELDS, finalizeCreate, importFile, getClearance } from './terminal/commands'
 import { demoStore } from './store'
 import { openDossierWindow } from './dossierWindow'
 import { openEditorWindow } from './editorWindow'
@@ -137,6 +137,64 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ---- 10-second inbox poller ----
+  // Scans the operator's inbox every 10s. When a NEW message arrives:
+  //   - if the mailbox window is open  → dispatch ccdt:mail:refresh (soft reload)
+  //   - if the mailbox window is closed → print a one-line notice to the terminal
+  // Tracks seen IDs in a ref so we only surface messages we haven't shown yet.
+  const seenMailIds = useRef(new Set())
+  useEffect(() => {
+    if (!isConfigured || !user) return
+    let stopped = false
+
+    const poll = async () => {
+      try {
+        const rows = await fetchInbox(ctx())
+        if (stopped || !Array.isArray(rows)) return
+        // Seed the seen-set on the first poll so we don't spam the terminal
+        // with messages that were already there before the poller started.
+        if (seenMailIds.current.size === 0) {
+          rows.forEach((r) => seenMailIds.current.add(r.id))
+          return
+        }
+        const fresh = rows.filter((r) => !seenMailIds.current.has(r.id))
+        if (!fresh.length) return
+        fresh.forEach((r) => seenMailIds.current.add(r.id))
+
+        // Is a mailbox window currently open?
+        const mailboxOpen = !!document.querySelector('.winbox.ccdt-win--mail')
+        if (mailboxOpen) {
+          // Soft-refresh the open mailbox.
+          document.querySelectorAll('.winbox.ccdt-win--mail .ccdt-mail').forEach((el) => {
+            el.dispatchEvent(new CustomEvent('ccdt:mail:refresh', { bubbles: true }))
+          })
+          // Also print a short notice so the terminal still records it.
+          const label = fresh.length === 1
+            ? `NEW MAIL from @${fresh[0].sender_username || fresh[0].sender_email || 'unknown'} — "${fresh[0].subject || '(no subject)'}"`
+            : `NEW MAIL — ${fresh.length} new messages in your inbox`
+          append([{ cls: 'ok', text: `▶ ${label}` }])
+        } else {
+          // No mailbox open — print one line per new message.
+          for (const m of fresh) {
+            const from = m.sender_username || m.sender_email || 'unknown'
+            const subj = m.subject || '(no subject)'
+            append([
+              { cls: 'ok', text: `▶ NEW MAIL from @${from} — "${subj}"` },
+              { cls: 'dim', text: `  type "mail inbox" to read, or "mail ${m.id}" to open directly` }
+            ])
+          }
+        }
+      } catch {
+        // Network hiccup — ignore, we'll retry next tick.
+      }
+    }
+
+    poll() // initial seed
+    const t = setInterval(poll, 10000)
+    return () => { stopped = true; clearInterval(t) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isConfigured])
 
   useEffect(() => {
     if (screenRef.current) screenRef.current.scrollTop = screenRef.current.scrollHeight

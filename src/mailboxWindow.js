@@ -87,7 +87,11 @@ export function openInboxWindow(ctx, openMessageWindow) {
     width: '780px',
     height: '80%',
     minheight: 320,
-    index: 9999
+    index: 9999,
+    onclose: () => {
+      wb.body.removeEventListener('ccdt:mail:refresh', onRefresh)
+      return true
+    }
   })
 
   const $list = wb.body.querySelector('#ccdt-mail-list')
@@ -131,6 +135,13 @@ export function openInboxWindow(ctx, openMessageWindow) {
   $compose.addEventListener('click', () => {
     openComposeWindow(ctx, {}, () => loadFolder(currentFolder))
   })
+
+  // Soft refresh — fired by App.jsx's 10s inbox poller when new mail arrives
+  // while this window is open. Silently reloads the current folder so the user
+  // sees new rows without having to click anything. Listener is removed in the
+  // WinBox `onclose` callback (defined above).
+  const onRefresh = () => loadFolder(currentFolder)
+  wb.body.addEventListener('ccdt:mail:refresh', onRefresh)
 
   // Initial load
   loadFolder('inbox')
