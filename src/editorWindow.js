@@ -4,7 +4,7 @@
 import WinBox from 'winbox/src/js/winbox.js'
 import 'winbox/dist/css/winbox.min.css'
 
-import { insertRecord } from './terminal/commands'
+import { insertRecord, updateRecord } from './terminal/commands'
 import { md2html } from './markdown'
 
 const CLASSIFICATIONS = ['PUBLIC', 'CONFIDENTIAL', 'SECRET', 'TOP SECRET']
@@ -43,11 +43,13 @@ async function uploadPhoto(file, ctx) {
 }
 
 export function openEditorWindow(ctx, prefill = {}, onSaved) {
+  const editing = !!prefill._editing
+  const titleText = editing ? 'CCDT — EDIT DOCUMENT' : 'CCDT — NEW DOCUMENT'
   const html = `
     <div class="ccdt-edit">
       <div class="ccdt-edit__bar">
-        <span class="ccdt-edit__title">CCDT — NEW DOCUMENT</span>
-        <button class="ccdt-edit__save" id="ccdt-e-save">SAVE</button>
+        <span class="ccdt-edit__title">${titleText}</span>
+        <button class="ccdt-edit__save" id="ccdt-e-save">${editing ? 'SAVE CHANGES' : 'SAVE'}</button>
         <button class="ccdt-edit__cancel" id="ccdt-e-cancel">CANCEL</button>
       </div>
 
@@ -92,7 +94,7 @@ export function openEditorWindow(ctx, prefill = {}, onSaved) {
       </div>
 
       <div class="ccdt-edit__body" id="ccdt-e-body">
-        <textarea id="ccdt-e-content" placeholder="Type your document here. Drag photos onto this area, or use 📷 PHOTO.&#10;&#10;Supports:&#10;# Heading 1&#10;## Heading 2&#10;### Heading 3&#10;**bold** *italic*&#10;- bullet&#10;> quote&#10;[link text](https://...)&#10;![alt](image-url)"></textarea>
+        <textarea id="ccdt-e-content" placeholder="Type your document here. Drag photos onto this area, or use 📷 PHOTO.&#10;&#10;Supports:&#10;# Heading 1&#10;## Heading 2&#10;### Heading 3&#10;**bold** *italic*&#10;- bullet&#10;> quote&#10;[link text](https://...)&#10;![alt](image-url)">${esc(prefill.content || '')}</textarea>
         <div id="ccdt-e-preview" class="ccdt-edit__preview" style="display:none"></div>
         <div id="ccdt-e-drop" class="ccdt-edit__drop">drop photos here</div>
       </div>
@@ -102,7 +104,7 @@ export function openEditorWindow(ctx, prefill = {}, onSaved) {
     </div>`
 
   const wb = new WinBox({
-    title: 'CCDT — NEW DOCUMENT',
+    title: titleText,
     class: 'ccdt-win ccdt-win--edit',
     html,
     background: '#05080a',
@@ -115,7 +117,7 @@ export function openEditorWindow(ctx, prefill = {}, onSaved) {
   })
 
   const $ = (s) => wb.body.querySelector(s)
-  const photos = []  // [{url, name}]
+  const photos = prefill.photos ? prefill.photos.map((p) => ({ ...p })) : []  // [{url, name}]
 
   const setStatus = (msg, color) => {
     const el = $('#ccdt-e-status')
@@ -262,7 +264,9 @@ export function openEditorWindow(ctx, prefill = {}, onSaved) {
     }
     setStatus('saving…', '#ffd166')
     try {
-      const res = await insertRecord(record, ctx)
+      const res = editing
+        ? await updateRecord(record, prefill._originalNumber, ctx)
+        : await insertRecord(record, ctx)
       setStatus(res[0]?.text || 'saved', '#38ff9a')
       if (onSaved) onSaved(res)
       setTimeout(() => wb.close(), 700)
@@ -272,6 +276,8 @@ export function openEditorWindow(ctx, prefill = {}, onSaved) {
   })
   $('#ccdt-e-cancel').addEventListener('click', () => wb.close())
 
-  setStatus('ready', '#888')
+  // Render any photos that came in with a prefilled (edit) record.
+  renderPhotos()
+  setStatus(editing ? 'editing existing record' : 'ready', editing ? '#ffd166' : '#888')
   return wb
 }

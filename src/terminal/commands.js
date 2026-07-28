@@ -6,7 +6,7 @@
 // A line is: { cls, text } | { clear: true } | { cls: 'dossier', data }
 
 import {
-  addDemoArchive, removeDemoArchive,
+  addDemoArchive, removeDemoArchive, updateDemoArchive,
   demoUsernameTaken, demoRegisterUsername, demoLookupByUsername,
   demoUsernames, demoMessages,
   demoAddMessage, demoMarkRead
@@ -88,6 +88,8 @@ const HELP = [
   { cls: 'ok', text: '▸ AUTHORING' },
   { cls: 'sys',  text: '  create [num "title"]   open the document editor (Word-style window with photos)' },
   { cls: 'dim',  text: '      fill the form, type Markdown, drag photos or use 📷 PHOTO' },
+  { cls: 'sys',  text: '  edit <number>          open an existing archive in the editor to modify + save' },
+  { cls: 'dim',  text: '      you must have access (clearance) to the record you edit' },
   { cls: 'sys',  text: '  load                  import a document from a file (.json/.txt/.md)' },
   { cls: 'dim',  text: '      .json maps fields · .txt/.md use filename as title + body as content' },
   { cls: 'dim', text: '' },
@@ -222,6 +224,30 @@ export async function insertRecord(record, ctx) {
   return [
     { cls: 'ok', text: `DOCUMENT COMMITTED (DEMO) // ARCHIVE ${record.archive_number}` },
     { cls: 'dim', text: 'stored in local session only — connect Supabase to persist.' }
+  ]
+}
+
+// Update an existing archive. `originalNumber` is the lookup key (the
+// archive_number may have been changed in the editor form). Clearance/auth is
+// already enforced by the caller (edit command) before this is reached.
+export async function updateRecord(record, originalNumber, ctx) {
+  if (ctx.isConfigured) {
+    const { data, error } = await ctx.supabase
+      .from('archives')
+      .update(record)
+      .eq('archive_number', String(originalNumber))
+      .select()
+      .single()
+    if (error) return [{ cls: 'err', text: `UPDATE FAILED: ${error.message}` }]
+    return [
+      { cls: 'ok', text: `DOCUMENT UPDATED // ARCHIVE ${data.archive_number}` },
+      { cls: 'dim', text: 'changes persisted to Supabase (archives table).' }
+    ]
+  }
+  updateDemoArchive(originalNumber, record)
+  return [
+    { cls: 'ok', text: `DOCUMENT UPDATED (DEMO) // ARCHIVE ${record.archive_number}` },
+    { cls: 'dim', text: 'updated in local session only — connect Supabase to persist.' }
   ]
 }
 
@@ -718,6 +744,32 @@ export async function runCommand(raw, ctx) {
           { cls: 'dim', text: 'fill the form, write content in markdown, drag photos onto the editor.' }
         ],
         openEditor: prefill
+      }
+    }
+    case 'edit': {
+      const guard = authGuard(ctx)
+      if (guard) return guard
+      const num = args[0]
+      if (!num) return [{ cls: 'warn', text: 'usage: edit <number>' }]
+      const found = await fetchOne(num, ctx)
+      if (!found.ok) {
+        if (found.reason === 'not_found') return [{ cls: 'err', text: `ARCHIVE ${num} NOT FOUND` }]
+        if (found.reason === 'denied') {
+          return [{ cls: 'err', text: `EDIT DENIED // ARCHIVE ${num} — insufficient clearance.` }]
+        }
+        return [{ cls: 'err', text: `ARCHIVE ${num} UNAVAILABLE` }]
+      }
+      return {
+        lines: [
+          { cls: 'ok', text: `OPENING EDITOR FOR ARCHIVE ${num}…` },
+          { cls: 'dim', text: 'modify the fields, then SAVE to commit your changes.' }
+        ],
+        openEditor: {
+          ...found.data,
+          photos: Array.isArray(found.data.photos) ? found.data.photos.map((p) => ({ ...p })) : [],
+          _editing: true,
+          _originalNumber: String(num)
+        }
       }
     }
     case 'load':

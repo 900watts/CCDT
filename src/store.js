@@ -18,6 +18,19 @@ export function removeDemoArchive(num) {
   return i >= 0
 }
 
+// Update an existing demo archive in place. `originalNumber` is the lookup key
+// (the archive_number may have been changed in the editor form); `fields` holds
+// the new column values.
+export function updateDemoArchive(originalNumber, fields) {
+  const a = demoStore.find((x) => x.archive_number === String(originalNumber))
+  if (!a) return false
+  const keys = ['archive_number', 'title', 'classification', 'department', 'content', 'tags', 'photos']
+  for (const k of keys) {
+    if (fields[k] !== undefined) a[k] = fields[k]
+  }
+  return true
+}
+
 export function demoUsernameTaken(username) {
   return demoUsernames.has(String(username).toLowerCase())
 }
