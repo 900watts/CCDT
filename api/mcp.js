@@ -15,18 +15,9 @@
 // VITE_SUPABASE_ANON_KEY from the project env, which the SPA already uses.
 
 import { createClient } from '@supabase/supabase-js'
-
-// MCP SDK imports are lazy-loaded inside the handler so the cheap GET
-// (server card) and /health paths don't pay the cost of a heavy import
-// graph (the SDK transitively pulls node:stream, node:url, etc.).
-async function getSdk() {
-  const [{ McpServer }, { WebStandardStreamableHTTPServerTransport }, { z }] = await Promise.all([
-    import('@modelcontextprotocol/sdk/server/mcp.js'),
-    import('@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'),
-    import('zod')
-  ])
-  return { McpServer, WebStandardStreamableHTTPServerTransport, z }
-}
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
+import { z } from 'zod'
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL
 const SUPABASE_ANON = process.env.VITE_SUPABASE_ANON_KEY
@@ -94,7 +85,7 @@ function linesToText(lines) {
 
 // --- MCP server factory ----------------------------------------------------
 
-function buildMcpServer(ctx, { McpServer, z }) {
+function buildMcpServer(ctx) {
   const server = new McpServer(
     {
       name: 'ccdt',
@@ -511,7 +502,7 @@ function gcSessions() {
   }
 }
 
-async function getOrCreateSession(request, ctx, sdk) {
+async function getOrCreateSession(request, ctx) {
   gcSessions()
   const incoming = request.headers.get('mcp-session-id')
   if (incoming && SESSIONS.has(incoming)) {
@@ -519,9 +510,9 @@ async function getOrCreateSession(request, ctx, sdk) {
     s.lastUsed = Date.now()
     return s
   }
-  const server = buildMcpServer(ctx, sdk)
+  const server = buildMcpServer(ctx)
   const session = { server, transport: null, ctx, id: null, lastUsed: Date.now() }
-  const transport = new sdk.WebStandardStreamableHTTPServerTransport({
+  const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: () => crypto.randomUUID(),
     onsessioninitialized: (id) => {
       session.id = id
@@ -629,7 +620,7 @@ export default async function handler(request) {
     if (!ctx.ok) {
       return jsonResponse({ error: 'auth_failed', message: ctx.reason }, 401)
     }
-    const session = await getOrCreateSession(request, ctx, await getSdk())
+    const session = await getOrCreateSession(request, ctx)
     try {
       return await session.transport.handleRequest(request)
     } catch (e) {
