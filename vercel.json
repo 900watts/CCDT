@@ -3,10 +3,9 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/llms.txt",       "destination": "/llms.txt" },
-    { "source": "/llms-full.txt",  "destination": "/llms-full.txt" },
-    { "source": "/sitemap.xml",    "destination": "/sitemap.xml" },
-    { "source": "/api/(.*)",       "destination": "/api/$1" },
+    { "source": "/llms.txt",       "destination": "/api/llms.txt" },
+    { "source": "/llms-full.txt",  "destination": "/api/llms-full.txt" },
+    { "source": "/sitemap.xml",    "destination": "/api/sitemap.xml" },
     { "source": "/(.*)",           "destination": "/index.html" }
   ],
   "headers": [
@@ -14,8 +13,8 @@
       "source": "/(llms\\.txt|llms-full\\.txt|api/.*|sitemap\\.xml)",
       "headers": [
         { "key": "Access-Control-Allow-Origin",  "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, User-Agent" }
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PATCH, DELETE, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, User-Agent" }
       ]
     }
   ]
