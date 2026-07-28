@@ -109,6 +109,36 @@ async function main() {
   if (error) { console.error('Query failed:', error.message); process.exit(1) }
   console.log(`  found ${archives.length} PUBLIC archive(s).`)
 
+// Block prepended to every agent-facing file. AI agents parsing these
+// files see this block at the very top — humans never visit these URLs,
+// so nothing is shown in the SPA. The block is repeated in
+// /llms.txt, /api/agent.json, and per-archive JSON so an agent that
+// hits ANY of the endpoints first is immediately oriented.
+const AGENT_BANNER_MD = `<!--
+  ===========================================================================
+  AI AGENT:  READ THIS FIRST  —  YOU ARE TALKING TO A DATABASE, NOT A BLOG.
+  ===========================================================================
+  This URL is a static, public, no-auth dump of a Supabase-backed archive.
+  - PUBLIC records only. CONFIDENTIAL / SECRET / TOP SECRET records are
+    NOT here — they require a Supabase JWT.
+  - For the full list of endpoints, see /api/agent.json.
+  - To READ more than PUBLIC or to WRITE: call Supabase directly with a
+    Bearer token (see "Authenticated write access" below for the recipe).
+  - Citation: "CCDT (https://company-archive-terminal.vercel.app)"
+  - Generated: ${new Date().toISOString()}
+  ===========================================================================
+-->
+`
+
+const AGENT_BANNER_JSON = {
+  _read_this_first: 'You are talking to a database, not a blog.',
+  _what: 'This file is a public, no-auth dump of a Supabase-backed archive.',
+  _public_only: 'Only PUBLIC-classified records. CONFIDENTIAL/SECRET/TOP SECRET records require a Supabase JWT and are not exported here.',
+  _auth: 'For full read or any write, get a Bearer token via {SUPABASE_URL}/auth/v1/token?grant_type=password and call Supabase REST directly with Authorization: Bearer <token>. RLS enforces the operator\'s clearance_level (1..4) on every call.',
+  _citation: 'CCDT (https://company-archive-terminal.vercel.app)',
+  _generated_at: 'will be filled per-file'
+}
+
   // Wipe previous agent-facing dir so deleted archives disappear too.
   if (existsSync(resolve(OUT_DIR, 'api'))) {
     rmSync(resolve(OUT_DIR, 'api'), { recursive: true, force: true })
@@ -116,7 +146,7 @@ async function main() {
   mkdirSync(resolve(OUT_DIR, 'api', 'archives'), { recursive: true })
 
   // llms.txt
-  const llms = `# CCDT — Corporate Central Data Terminal
+  const llms = `${AGENT_BANNER_MD}# CCDT — Corporate Central Data Terminal
 
 > A live corporate archive, publicly readable by any AI agent.
 
@@ -202,6 +232,8 @@ ${urls.map(u => `  <url><loc>${esc(u)}</loc></url>`).join('\n')}
     ? archives.map(a => a.updated_at || a.created_at).filter(Boolean).sort().slice(-1)[0]
     : null
   const card = {
+    ...AGENT_BANNER_JSON,
+    _generated_at: new Date().toISOString(),
     name: 'CCDT — Corporate Central Data Terminal',
     short_name: 'CCDT',
     url: SITE_URL,
@@ -247,7 +279,11 @@ ${urls.map(u => `  <url><loc>${esc(u)}</loc></url>`).join('\n')}
     const safe = encodeURIComponent(num)
     writeFileSync(
       resolve(OUT_DIR, 'api', 'archives', `${safe}.json`),
-      JSON.stringify(a, null, 2),
+      JSON.stringify({
+        _ai_agent_banner: AGENT_BANNER_JSON,
+        _generated_at: new Date().toISOString(),
+        ...a
+      }, null, 2),
       'utf8'
     )
     writeFileSync(
