@@ -15,9 +15,18 @@
 // VITE_SUPABASE_ANON_KEY from the project env, which the SPA already uses.
 
 import { createClient } from '@supabase/supabase-js'
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
-import { z } from 'zod'
+
+// MCP SDK imports are lazy-loaded inside the handler so the cheap GET
+// (server card) and /health paths don't pay the cost of a heavy import
+// graph (the SDK transitively pulls node:stream, node:url, etc.).
+async function getSdk() {
+  const [{ McpServer }, { WebStandardStreamableHTTPServerTransport }, { z }] = await Promise.all([
+    import('@modelcontextprotocol/sdk/server/mcp.js'),
+    import('@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'),
+    import('zod')
+  ])
+  return { McpServer, WebStandardStreamableHTTPServerTransport, z }
+}
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL
 const SUPABASE_ANON = process.env.VITE_SUPABASE_ANON_KEY
@@ -85,7 +94,7 @@ function linesToText(lines) {
 
 // --- MCP server factory ----------------------------------------------------
 
-function buildMcpServer(ctx) {
+function buildMcpServer(ctx, { McpServer, z }) {
   const server = new McpServer(
     {
       name: 'ccdt',
@@ -502,7 +511,7 @@ function gcSessions() {
   }
 }
 
-async function getOrCreateSession(request, ctx) {
+async function getOrCreateSession(request, ctx, sdk) {
   gcSessions()
   const incoming = request.headers.get('mcp-session-id')
   if (incoming && SESSIONS.has(incoming)) {
@@ -510,9 +519,9 @@ async function getOrCreateSession(request, ctx) {
     s.lastUsed = Date.now()
     return s
   }
-  const server = buildMcpServer(ctx)
+  const server = buildMcpServer(ctx, sdk)
   const session = { server, transport: null, ctx, id: null, lastUsed: Date.now() }
-  const transport = new WebStandardStreamableHTTPServerTransport({
+  const transport = new sdk.WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: () => crypto.randomUUID(),
     onsessioninitialized: (id) => {
       session.id = id
@@ -619,8 +628,12 @@ export default async function handler(request) {
   if (!ctx.ok) {
     return jsonResponse({ error: 'auth_failed', message: ctx.reason }, 401)
   }
-  const session = await getOrCreateSession(request, ctx)
-  return session.transport.handleRequest(request)
+  const session = await getOrCreateSession(request, ctx, await getSdk())
+  try {
+    return await session.transport.handleRequest(request)
+  } catch (e) {
+    return jsonResponse({ error: 'mcp_transport_failed', message: String(e?.message || e) }, 500)
+  }
 }
 
 // Pin to the Node.js runtime: the MCP SDK pulls in some node:* modules
