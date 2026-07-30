@@ -427,35 +427,63 @@ async function who(args, ctx) {
   })
 
   const myPeerId = peers.find((p) => p.self)?.tab
-  const out = [
-    { cls: 'ok',  text: `OPERATORS ONLINE (${deduped.length})` },
-    { cls: 'dim', text: 'NAME'.padEnd(16) + 'CLEARANCE'.padEnd(11) + 'CHANNEL'.padEnd(8) + 'EMAIL / DEPARTMENT' }
-  ]
+  const out = [{ cls: 'ok', text: `OPERATORS ONLINE (${deduped.length})` }]
 
-  for (const { peer, profile } of deduped) {
+  // Render each row as a column-aligned record. We compute column widths
+  // off the actual data (column -t style) so any username / email /
+  // clearance length slots in without spilling across columns.
+  const rows = deduped.map(({ peer, profile }) => {
     const isMe = peer.tab === myPeerId
-    const tag = isMe ? '◀ self' : ''
-    const name =
-      (profile?.username && '@' + profile.username) ||
-      profile?.email ||
-      '(unnamed)'
     const clearance = Number(profile?.clearance_level) || 1
     const clearanceTag =
       clearance >= 4 ? 'L4 TOP SECRET' :
       clearance === 3 ? 'L3 SECRET' :
       clearance === 2 ? 'L2 CONFIDENTIAL' :
                         'L1 PUBLIC'
-    const channel = isMe ? 'realtime' : 'realtime'
-    const email = profile?.email ? profile.email : ''
-    out.push({
-      cls: isMe ? 'ok' : 'sys',
-      text:
-        `  ${name.padEnd(15)} ` +
-        `${clearanceTag.padEnd(11)} ` +
-        `${channel.padEnd(8)} ` +
-        `${email}` +
-        (tag ? `  ${tag}` : '')
+    return {
+      isMe,
+      name:
+        (profile?.username && '@' + profile.username) ||
+        profile?.email ||
+        '(unnamed)',
+      clearance: clearanceTag,
+      channel: 'realtime',
+      email: profile?.email || '',
+      tag: isMe ? '◀ self' : ''
+    }
+  })
+
+  // Column widths: header has the right length caps, data drives the minimum.
+  const cols = [
+    { header: 'NAME',     get: (r) => r.name      },
+    { header: 'CLEARANCE',get: (r) => r.clearance },
+    { header: 'CHANNEL',  get: (r) => r.channel   },
+    { header: 'EMAIL',    get: (r) => r.email     }
+  ]
+  for (const col of cols) {
+    col.width = col.header.length
+    for (const r of rows) col.width = Math.max(col.width, col.get(r).length)
+    // Hard cap — emails beyond 32 chars would dominate the screen.
+    const HARD = 36
+    if (col.width > HARD) col.width = HARD
+  }
+
+  const renderRow = (r) => {
+    const cells = cols.map((col) => {
+      const raw = col.get(r)
+      const val = raw.length > col.width ? raw.slice(0, col.width - 1) + '…' : raw
+      return val.padEnd(col.width, ' ')
     })
+    return '  ' + cells.join('  ') + (r.tag ? '  ' + r.tag : '')
+  }
+  const renderHeader = () => {
+    const cells = cols.map((col) => col.header.padEnd(col.width, ' '))
+    return '  ' + cells.join('  ')
+  }
+  out.push({ cls: 'dim', text: renderHeader() })
+
+  for (const r of rows) {
+    out.push({ cls: r.isMe ? 'ok' : 'sys', text: renderRow(r) })
   }
   out.push({ cls: 'dim', text: '' })
   out.push({
