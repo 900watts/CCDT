@@ -349,31 +349,28 @@ async function list(args, ctx) {
   return out
 }
 
-// Pulls the email->username/clearance mapping for peers that haven't broadcast
+// Pulls the username/clearance mapping for peers that haven't broadcast
 // (or whose broadcast arrived before Supabase auth populated `user_metadata`).
+// Note: public.users has id/username/clearance_level but NO `email` column
+// (emails live in auth.users, not the public profile table).
 async function _enrichPeers(supabase, profiles) {
   if (!supabase || !profiles?.length) return profiles
   const ids = profiles.map((p) => p?.id).filter(Boolean)
   if (!ids.length) return profiles
   const { data } = await supabase
     .from('users')
-    .select('id,username,email,clearance_level')
+    .select('id,username')
     .in('id', ids)
     .catch(() => ({ data: null }))
   if (!data) return profiles
   const byId = new Map(data.map((u) => [u.id, u]))
   return profiles.map((p) => {
-    if (!p || p.id) return p
-    return p
-  }).map((p) => {
-    if (!p?.id) return p
+    if (!p) return p
     const row = byId.get(p.id)
     if (!row) return p
     return {
       ...p,
-      username: p.username || row.username || null,
-      email: p.email || row.email || null,
-      clearance_level: Number(p.clearance_level) || Number(row.clearance_level) || 1
+      username: p.username || row.username || null
     }
   })
 }
@@ -381,15 +378,23 @@ async function _enrichPeers(supabase, profiles) {
 async function who(args, ctx) {
   // Available even without auth — DEMO mode shows the local tab + any
   // real session; authenticated mode shows everyone connected.
-  const peers = getOnlinePeers()
+  let peers
+  try { peers = getOnlinePeers() } catch (e) {
+    return [{ cls: 'err', text: `WHO failed (presence module): ${e.message}` }]
+  }
 
   // Enrich from public.users so peers appear with their username even when
   // their broadcast raced ahead of the auth metadata hydration.
   let visible = peers.filter((p) => p && p.profile && p.profile.id)
-  if (ctx.isConfigured) {
-    visible = await _enrichPeers(ctx.supabase, visible.map((p) => p.profile))
-    // Re-attach metadata to each peer so the renderer can tell self from others.
-    visible = peers.map((p) => ({ peer: p, profile: visible.find((x) => x && x.id === p.profile?.id) || p.profile }))
+  if (ctx.isConfigured && ctx.supabase) {
+    try {
+      const enriched = await _enrichPeers(ctx.supabase, visible.map((p) => p.profile))
+      visible = peers.map((p) => ({ peer: p, profile: enriched.find((x) => x && x.id === p.profile?.id) || p.profile }))
+    } catch (e) {
+      // Enrichment is best-effort. Fall back to bare profiles.
+      visible = peers.map((p) => ({ peer: p, profile: p.profile }))
+      visible.__enrichErr = e.message
+    }
   } else {
     visible = peers.map((p) => ({ peer: p, profile: p.profile }))
   }
@@ -457,6 +462,12 @@ async function who(args, ctx) {
     cls: 'dim',
     text: 'Tip: presence comes from the realtime channel. A tab without live websocket counts as offline.'
   })
+  if (visible.__enrichErr) {
+    out.push({
+      cls: 'warn',
+      text: `note: profile enrichment skipped (${visible.__enrichErr}) — username/clearance may be incomplete.`
+    })
+  }
   return out
 }
 
