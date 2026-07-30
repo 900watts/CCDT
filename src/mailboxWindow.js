@@ -7,6 +7,7 @@ import 'winbox/dist/css/winbox.min.css'
 import {
   fetchInbox, fetchSent, doSendMessage, doMarkRead, getClearance
 } from './terminal/commands'
+import { nextZIndex, registerWindow, focusIfExists } from './windowStack'
 
 const CLASS_COLOR = {
   SECRET: '#ff4d6d',
@@ -64,6 +65,9 @@ function renderList(messages, folder) {
 function messageRowRow(m, folder) { return messageRowHTML(m, folder) }
 
 export function openInboxWindow(ctx, openMessageWindow) {
+  // Dedup: if the inbox is already open, focus it instead of spawning a duplicate.
+  if (focusIfExists('mail:inbox')) return
+
   const html = `
     <div class="ccdt-mail">
       <div class="ccdt-mail__bar">
@@ -87,9 +91,9 @@ export function openInboxWindow(ctx, openMessageWindow) {
     width: '780px',
     height: '80%',
     minheight: 320,
-    index: 9999,
+    index: nextZIndex(),
     onclose: () => {
-      wb.body.removeEventListener('ccdt:mail:refresh', onRefresh)
+      try { wb.body.removeEventListener('ccdt:mail:refresh', onRefresh) } catch {}
       return true
     }
   })
@@ -146,6 +150,7 @@ export function openInboxWindow(ctx, openMessageWindow) {
   // Initial load
   loadFolder('inbox')
 
+  registerWindow('mail:inbox', wb)
   return wb
 }
 
@@ -197,7 +202,7 @@ export function openComposeWindow(ctx, prefill, onSent) {
     width: '640px',
     height: '80%',
     minheight: 360,
-    index: 10000
+    index: nextZIndex()
   })
 
   const $status = wb.body.querySelector('#ccdt-c-status')
@@ -264,7 +269,7 @@ export function openMessageWindow(msg, ctx, onBack) {
     width: '640px',
     height: '74%',
     minheight: 240,
-    index: 10001
+    index: nextZIndex()
   })
 
   wb.body.querySelector('#ccdt-msg-close').addEventListener('click', () => wb.close())

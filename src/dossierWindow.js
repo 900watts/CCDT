@@ -3,6 +3,7 @@
 import WinBox from 'winbox/src/js/winbox.js'
 import 'winbox/dist/css/winbox.min.css'
 import { md2html } from './markdown'
+import { nextZIndex, registerWindow, focusIfExists } from './windowStack'
 
 const CLASS_COLOR = {
   SECRET: '#ff4d6d',
@@ -33,6 +34,9 @@ function esc(s) {
 
 export function openDossierWindow(row, opts = {}) {
   if (!row) return null
+  // Dedup: if a dossier for this archive is already open, focus it.
+  const dedupKey = 'dossier:' + row.archive_number
+  if (focusIfExists(dedupKey)) return null
   const cls = (row.classification || 'PUBLIC').toUpperCase()
   const color = CLASS_COLOR[cls] || '#38ff9a'
   const tags = Array.isArray(row.tags) ? row.tags.join(', ') : row.tags || '—'
@@ -79,7 +83,7 @@ export function openDossierWindow(row, opts = {}) {
       <div class="ccdt-dossier__content">${md2html(row.content) || '<em>(no content)</em>'}</div>
     </div>`
 
-  return new WinBox({
+  const wb = new WinBox({
     title: `ARCHIVE ${row.archive_number} — ${esc(row.title).slice(0, 40)}`,
     class: 'ccdt-win',
     html,
@@ -90,6 +94,8 @@ export function openDossierWindow(row, opts = {}) {
     width: '640px',
     height: '72%',
     minheight: 240,
-    index: 9999
+    index: nextZIndex()
   })
+  registerWindow(dedupKey, wb)
+  return wb
 }

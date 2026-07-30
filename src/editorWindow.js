@@ -6,6 +6,7 @@ import 'winbox/dist/css/winbox.min.css'
 
 import { insertRecord, updateRecord } from './terminal/commands'
 import { md2html } from './markdown'
+import { nextZIndex, registerWindow, focusIfExists } from './windowStack'
 
 const CLASSIFICATIONS = ['PUBLIC', 'CONFIDENTIAL', 'SECRET', 'TOP SECRET']
 const MAX_FILE_BYTES = 10 * 1024 * 1024  // 10 MB
@@ -44,6 +45,10 @@ async function uploadPhoto(file, ctx) {
 
 export function openEditorWindow(ctx, prefill = {}, onSaved) {
   const editing = !!prefill._editing
+  // Dedup: if editing an existing archive and that editor is already open, focus it.
+  // New-create editors always open fresh (no dedup key).
+  const dedupKey = editing ? 'editor:' + (prefill.archive_number || '') : null
+  if (dedupKey && focusIfExists(dedupKey)) return
   const titleText = editing ? 'CCDT — EDIT DOCUMENT' : 'CCDT — NEW DOCUMENT'
   const html = `
     <div class="ccdt-edit">
@@ -113,8 +118,9 @@ export function openEditorWindow(ctx, prefill = {}, onSaved) {
     width: '900px',
     height: '86%',
     minheight: 460,
-    index: 9999
+    index: nextZIndex()
   })
+  if (dedupKey) registerWindow(dedupKey, wb)
 
   const $ = (s) => wb.body.querySelector(s)
   const photos = prefill.photos ? prefill.photos.map((p) => ({ ...p })) : []  // [{url, name}]
