@@ -173,14 +173,14 @@ export default function App() {
           const label = fresh.length === 1
             ? `NEW MAIL from @${fresh[0].sender_username || fresh[0].sender_email || 'unknown'} — "${fresh[0].subject || '(no subject)'}"`
             : `NEW MAIL — ${fresh.length} new messages in your inbox`
-          append([{ cls: 'ok', text: `▶ ${label}` }])
+          append([{ cls: 'ok', text: `▶ ${label}`, fresh: true }])
         } else {
           // No mailbox open — print one line per new message.
           for (const m of fresh) {
             const from = m.sender_username || m.sender_email || 'unknown'
             const subj = m.subject || '(no subject)'
             append([
-              { cls: 'ok', text: `▶ NEW MAIL from @${from} — "${subj}"` },
+              { cls: 'ok', text: `▶ NEW MAIL from @${from} — "${subj}"`, fresh: true },
               { cls: 'dim', text: `  type "mail inbox" to read, or "mail ${m.id}" to open directly` }
             ])
           }
@@ -536,7 +536,7 @@ export default function App() {
             l.cls === 'dossier' ? (
               <Dossier key={l.id} data={l.data} />
             ) : (
-              <div key={l.id} className={`line ${l.cls || 'sys'}`}>
+              <div key={l.id} className={`line ${l.cls || 'sys'}`} data-fresh={l.fresh ? '' : undefined}>
                 {l.text}
               </div>
             )

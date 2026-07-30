@@ -10,6 +10,14 @@
   --conf: #ffd166;
   --pub: #38ff9a;
   --line: #11331f;
+
+  /* ── Emil Kowalski animation curves ── */
+  /* Strong ease-out for enter animations and hover feedback */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Strong ease-in-out for on-screen movement */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  /* iOS-like drawer curve for window entry */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 * { box-sizing: border-box; }
@@ -57,8 +65,12 @@ html, body, #root {
   padding: 8px 16px;
   cursor: pointer;
   text-transform: uppercase;
+  transition: color 150ms var(--ease-out), background-color 150ms var(--ease-out);
 }
-.tab:hover { color: var(--fg); background: rgba(56,255,154,0.05); }
+@media (hover: hover) and (pointer: fine) {
+  .tab:hover { color: var(--fg); background: rgba(56,255,154,0.05); }
+}
+.tab:active { transform: scale(0.97); }
 .tab--active { color: var(--fg-bright); background: var(--panel); border-bottom: 2px solid var(--fg); }
 
 .terminal__bar .ok, .terminal__bar .warn {
@@ -142,7 +154,9 @@ html, body, #root {
   padding: 10px 16px;
   border-top: 1px solid var(--line);
   background: var(--panel);
+  transition: border-color 200ms var(--ease-out);
 }
+.terminal__input:focus-within { border-top-color: var(--fg-dim); }
 .terminal__input .prompt { color: var(--fg); white-space: nowrap; }
 .terminal__input input {
   flex: 1;
@@ -184,6 +198,7 @@ html, body, #root {
   padding: 4px 10px;
   outline: none;
   width: 200px;
+  transition: border-color 150ms var(--ease-out);
 }
 .dbview__search:focus { border-color: var(--fg-dim); }
 .dbview__btn {
@@ -193,8 +208,12 @@ html, body, #root {
   font: inherit;
   padding: 4px 10px;
   cursor: pointer;
+  transition: border-color 150ms var(--ease-out), color 150ms var(--ease-out);
 }
-.dbview__btn:hover { border-color: var(--fg); }
+@media (hover: hover) and (pointer: fine) {
+  .dbview__btn:hover { border-color: var(--fg); }
+}
+.dbview__btn:active { transform: scale(0.97); }
 .dbview__err { color: var(--err); padding: 8px 16px; }
 .dbview__empty { color: var(--fg-dim); padding: 24px 16px; }
 .dbview__grid {
@@ -218,9 +237,16 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  transition: border-color .12s, transform .12s;
+  transition: border-color 200ms var(--ease-out), transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
 }
-.dbcard:hover { border-color: var(--fg); transform: translateY(-1px); }
+@media (hover: hover) and (pointer: fine) {
+  .dbcard:hover {
+    border-color: var(--fg);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(56,255,154,0.08);
+  }
+}
+.dbcard:active { transform: scale(0.98); }
 .dbcard__top { display: flex; justify-content: space-between; align-items: center; }
 .dbcard__num { color: var(--fg-bright); font-weight: bold; letter-spacing: 1px; }
 .dbcard__cls {
@@ -286,8 +312,12 @@ html, body, #root {
   font-size: 12px;
   font-weight: bold;
   letter-spacing: 1px;
+  transition: background-color 150ms var(--ease-out), transform 150ms var(--ease-out);
 }
-.ccdt-mail__compose:hover { background: var(--fg-bright); }
+@media (hover: hover) and (pointer: fine) {
+  .ccdt-mail__compose:hover { background: var(--fg-bright); }
+}
+.ccdt-mail__compose:active { transform: scale(0.97); }
 .ccdt-mail__tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
 .ccdt-mail__tab {
   background: transparent;
@@ -298,8 +328,12 @@ html, body, #root {
   font: inherit;
   font-size: 12px;
   letter-spacing: 1px;
+  transition: color 150ms var(--ease-out);
 }
-.ccdt-mail__tab:hover { color: var(--fg); }
+@media (hover: hover) and (pointer: fine) {
+  .ccdt-mail__tab:hover { color: var(--fg); }
+}
+.ccdt-mail__tab:active { transform: scale(0.97); }
 .ccdt-mail__tab--active { color: var(--fg-bright); border-bottom: 2px solid var(--fg); }
 .ccdt-mail__tab span { color: var(--fg-dim); margin-left: 6px; font-size: 10px; }
 .ccdt-mail__list { display: flex; flex-direction: column; gap: 1px; max-height: calc(100% - 110px); overflow-y: auto; }
@@ -309,8 +343,12 @@ html, body, #root {
   border-bottom: 1px solid #0a1410;
   cursor: pointer;
   display: flex; flex-direction: column; gap: 4px;
+  transition: background-color 150ms var(--ease-out);
 }
-.ccdt-msg:hover { background: rgba(56,255,154,0.04); }
+@media (hover: hover) and (pointer: fine) {
+  .ccdt-msg:hover { background: rgba(56,255,154,0.04); }
+}
+.ccdt-msg:active { transform: scale(0.99); }
 .ccdt-msg--unread { background: rgba(56,255,154,0.06); border-left: 2px solid var(--fg); padding-left: 8px; }
 .ccdt-msg__head { display: flex; justify-content: space-between; font-size: 11px; color: var(--fg-dim); }
 .ccdt-msg__from { font-weight: bold; }
@@ -330,6 +368,7 @@ html, body, #root {
   padding: 6px 8px; margin-top: 4px;
   font: inherit; font-size: 13px;
   outline: none;
+  transition: border-color 150ms var(--ease-out);
 }
 .ccdt-compose__inp:focus { border-color: var(--fg-dim); }
 .ccdt-compose__ta { min-height: 140px; resize: vertical; font-family: inherit; }
@@ -337,8 +376,12 @@ html, body, #root {
 .ccdt-compose__btn {
   background: var(--fg); color: #05080a; border: none;
   padding: 7px 16px; cursor: pointer; font: inherit; font-weight: bold; letter-spacing: 1px; font-size: 12px;
+  transition: background-color 150ms var(--ease-out), transform 150ms var(--ease-out);
 }
-.ccdt-compose__btn:hover { background: var(--fg-bright); }
+@media (hover: hover) and (pointer: fine) {
+  .ccdt-compose__btn:hover { background: var(--fg-bright); }
+}
+.ccdt-compose__btn:active { transform: scale(0.97); }
 .ccdt-compose__btn--ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
 .ccdt-compose__btn--ghost:hover { border-color: var(--fg); }
 .ccdt-compose__status { color: var(--fg-dim); font-size: 12px; }
@@ -359,23 +402,35 @@ html, body, #root {
 .ccdt-edit { display: flex; flex-direction: column; height: 100%; padding: 12px 14px; color: var(--fg); font-family: inherit; gap: 8px; min-height: 0; }
 .ccdt-edit__bar { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .ccdt-edit__title { color: var(--fg-bright); font-weight: bold; letter-spacing: 2px; font-size: 13px; }
-.ccdt-edit__save { margin-left: auto; background: var(--fg); color: #05080a; border: none; padding: 6px 14px; cursor: pointer; font: inherit; font-weight: bold; letter-spacing: 1px; font-size: 12px; }
-.ccdt-edit__save:hover { background: var(--fg-bright); }
-.ccdt-edit__cancel { background: transparent; color: var(--fg); border: 1px solid var(--line); padding: 6px 14px; cursor: pointer; font: inherit; letter-spacing: 1px; font-size: 12px; }
-.ccdt-edit__cancel:hover { border-color: var(--fg); }
+.ccdt-edit__save { margin-left: auto; background: var(--fg); color: #05080a; border: none; padding: 6px 14px; cursor: pointer; font: inherit; font-weight: bold; letter-spacing: 1px; font-size: 12px; transition: background-color 150ms var(--ease-out), transform 150ms var(--ease-out); }
+@media (hover: hover) and (pointer: fine) {
+  .ccdt-edit__save:hover { background: var(--fg-bright); }
+}
+.ccdt-edit__save:active { transform: scale(0.97); }
+.ccdt-edit__cancel { background: transparent; color: var(--fg); border: 1px solid var(--line); padding: 6px 14px; cursor: pointer; font: inherit; letter-spacing: 1px; font-size: 12px; transition: border-color 150ms var(--ease-out), transform 150ms var(--ease-out); }
+@media (hover: hover) and (pointer: fine) {
+  .ccdt-edit__cancel:hover { border-color: var(--fg); }
+}
+.ccdt-edit__cancel:active { transform: scale(0.97); }
 .ccdt-edit__form { display: flex; flex-direction: column; gap: 6px; }
 .ccdt-edit__lbl { display: block; font-size: 10px; color: var(--fg-dim); letter-spacing: 1px; text-transform: uppercase; }
 .ccdt-edit__lbl--half { display: inline-block; width: 49%; }
 .ccdt-edit__row { display: flex; gap: 2%; }
-.ccdt-edit__inp { display: block; width: 100%; background: #05080a; color: var(--fg-bright); border: 1px solid var(--line); padding: 5px 8px; margin-top: 3px; font: inherit; font-size: 13px; outline: none; }
+.ccdt-edit__inp { display: block; width: 100%; background: #05080a; color: var(--fg-bright); border: 1px solid var(--line); padding: 5px 8px; margin-top: 3px; font: inherit; font-size: 13px; outline: none; transition: border-color 150ms var(--ease-out); }
 .ccdt-edit__inp:focus { border-color: var(--fg-dim); }
 .ccdt-edit__tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); margin-top: 4px; }
-.ccdt-edit__tab { background: transparent; border: none; color: var(--fg-dim); padding: 6px 14px; cursor: pointer; font: inherit; font-size: 11px; letter-spacing: 1px; }
-.ccdt-edit__tab:hover { color: var(--fg); }
+.ccdt-edit__tab { background: transparent; border: none; color: var(--fg-dim); padding: 6px 14px; cursor: pointer; font: inherit; font-size: 11px; letter-spacing: 1px; transition: color 150ms var(--ease-out); }
+@media (hover: hover) and (pointer: fine) {
+  .ccdt-edit__tab:hover { color: var(--fg); }
+}
+.ccdt-edit__tab:active { transform: scale(0.97); }
 .ccdt-edit__tab--active { color: var(--fg-bright); border-bottom: 2px solid var(--fg); }
 .ccdt-edit__toolbar { display: flex; gap: 4px; flex-wrap: wrap; padding: 6px 0; }
-.ccdt-edit__toolbar button { background: #05080a; color: var(--fg); border: 1px solid var(--line); padding: 4px 10px; cursor: pointer; font: inherit; font-size: 12px; min-width: 28px; }
-.ccdt-edit__toolbar button:hover { border-color: var(--fg); background: rgba(56,255,154,0.05); }
+.ccdt-edit__toolbar button { background: #05080a; color: var(--fg); border: 1px solid var(--line); padding: 4px 10px; cursor: pointer; font: inherit; font-size: 12px; min-width: 28px; transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out), transform 150ms var(--ease-out); }
+@media (hover: hover) and (pointer: fine) {
+  .ccdt-edit__toolbar button:hover { border-color: var(--fg); background: rgba(56,255,154,0.05); }
+}
+.ccdt-edit__toolbar button:active { transform: scale(0.95); }
 .ccdt-edit__body { position: relative; flex: 1; min-height: 200px; display: flex; }
 .ccdt-edit__body textarea { width: 100%; height: 100%; background: #05080a; color: var(--fg-bright); border: 1px solid var(--line); padding: 10px 12px; font: inherit; font-size: 13px; line-height: 1.6; resize: none; outline: none; }
 .ccdt-edit__body textarea:focus { border-color: var(--fg-dim); }
@@ -394,3 +449,119 @@ html, body, #root {
 .ccdt-edit__photo-name { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); color: var(--fg-dim); font-size: 9px; padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ccdt-edit__photo-rm { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7); color: #ff5b5b; border: none; width: 16px; height: 16px; cursor: pointer; line-height: 14px; font-size: 12px; padding: 0; }
 .ccdt-edit__status { color: var(--fg-dim); font-size: 11px; padding-top: 4px; text-align: right; min-height: 16px; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATIONS — Emil Kowalski design engineering philosophy
+   Principles:
+   - Only animate transform + opacity (GPU-accelerated, no layout/paint)
+   - Never animate from scale(0) — start from scale(0.95) with opacity
+   - Use ease-out for enter, never ease-in
+   - Custom cubic-bezier curves, not built-in easings
+   - Durations: 100-160ms (press), 125-200ms (hover), 200-300ms (entry)
+   - Stagger delays: 30-80ms between items
+   - CSS transitions (not keyframes) for interruptible UI
+   - @media (hover: hover) gates hover on touch devices
+   - @media (prefers-reduced-motion) disables motion for accessibility
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Terminal line entry — subtle fade-up for new lines ── */
+.line {
+  animation: lineEnter 180ms var(--ease-out) both;
+}
+@keyframes lineEnter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Pinned boot lines don't animate (they're the static banner) */
+.line.pinned {
+  animation: none;
+}
+
+/* ── New mail notification — brief highlight pulse ── */
+.line.ok[data-fresh] {
+  animation: freshPulse 1.2s var(--ease-out);
+}
+@keyframes freshPulse {
+  0%   { opacity: 0; transform: translateY(6px); background: rgba(56,255,154,0.12); }
+  15%  { opacity: 1; transform: translateY(0); }
+  100% { background: transparent; }
+}
+
+/* ── Dossier inline render — scale-in from 0.98 ── */
+.dossier {
+  animation: dossierEnter 250ms var(--ease-out) both;
+}
+@keyframes dossierEnter {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Database card staggered entry ── */
+.dbcard {
+  animation: cardEnter 280ms var(--ease-out) both;
+}
+.dbcard:nth-child(1) { animation-delay: 0ms; }
+.dbcard:nth-child(2) { animation-delay: 40ms; }
+.dbcard:nth-child(3) { animation-delay: 80ms; }
+.dbcard:nth-child(4) { animation-delay: 120ms; }
+.dbcard:nth-child(5) { animation-delay: 160ms; }
+.dbcard:nth-child(6) { animation-delay: 200ms; }
+.dbcard:nth-child(7) { animation-delay: 240ms; }
+.dbcard:nth-child(8) { animation-delay: 280ms; }
+.dbcard:nth-child(9) { animation-delay: 320ms; }
+.dbcard:nth-child(10) { animation-delay: 360ms; }
+.dbcard:nth-child(n+11) { animation-delay: 400ms; }
+@keyframes cardEnter {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── WinBox window content — fade-in on open ── */
+.wb-body > * {
+  animation: winboxContentEnter 200ms var(--ease-out) both;
+}
+@keyframes winboxContentEnter {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Mail message row entry ── */
+.ccdt-msg {
+  animation: msgEnter 160ms var(--ease-out) both;
+}
+.ccdt-msg:nth-child(1) { animation-delay: 0ms; }
+.ccdt-msg:nth-child(2) { animation-delay: 30ms; }
+.ccdt-msg:nth-child(3) { animation-delay: 60ms; }
+.ccdt-msg:nth-child(4) { animation-delay: 90ms; }
+.ccdt-msg:nth-child(5) { animation-delay: 120ms; }
+.ccdt-msg:nth-child(n+6) { animation-delay: 150ms; }
+@keyframes msgEnter {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Scrollbar polish ── */
+.terminal__screen::-webkit-scrollbar-thumb {
+  transition: background 150ms var(--ease-out);
+}
+.terminal__screen:hover::-webkit-scrollbar-thumb {
+  background: var(--fg-dim);
+}
+
+/* ── Accessibility: respect reduced-motion preference ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  /* Keep opacity-only fade for comprehension, remove movement */
+  .line, .dossier, .dbcard, .wb-body > *, .ccdt-msg {
+    animation: fadeOnly 100ms ease both;
+  }
+  @keyframes fadeOnly {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+}
