@@ -92,10 +92,14 @@ export function openInboxWindow(ctx, openMessageWindow) {
     height: '80%',
     minheight: 320,
     index: nextZIndex(),
-    onclose: () => {
-      try { wb.body.removeEventListener('ccdt:mail:refresh', onRefresh) } catch {}
-      return true
-    }
+    // onclose intentionally undefined — see windowStack.js for the inverted
+    // semantics gotcha. registerWindow() sets wb.onclose to a wrapper that
+    // returns false so WinBox actually unmounts.
+    onclose: undefined
+  })
+  registerWindow('mail:inbox', wb, () => {
+    // Cleanup when the window closes (this runs after WinBox unmounts).
+    try { wb.body && wb.body.removeEventListener('ccdt:mail:refresh', onRefresh) } catch {}
   })
 
   const $list = wb.body.querySelector('#ccdt-mail-list')
