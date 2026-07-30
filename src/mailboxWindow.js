@@ -146,15 +146,14 @@ export function openInboxWindow(ctx, openMessageWindow) {
 
   // Soft refresh — fired by App.jsx's 10s inbox poller when new mail arrives
   // while this window is open. Silently reloads the current folder so the user
-  // sees new rows without having to click anything. Listener is removed in the
-  // WinBox `onclose` callback (defined above).
+  // sees new rows without having to click anything. The registerWindow() call
+  // above wires onclose to remove this listener automatically.
   const onRefresh = () => loadFolder(currentFolder)
   wb.body.addEventListener('ccdt:mail:refresh', onRefresh)
 
   // Initial load
   loadFolder('inbox')
 
-  registerWindow('mail:inbox', wb)
   return wb
 }
 
