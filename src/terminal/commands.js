@@ -108,6 +108,10 @@ const HELP = [
   { cls: 'sys',  text: '  register              create an operator account (guided: email, password, clearance)' },
   { cls: 'dim',  text: '      or inline: register me@corp.com hunter2 3   (clearance 1-4)' },
   { cls: 'sys',  text: '  logout                end the current session' },
+  { cls: 'sys',  text: '  changepass [old new]  change your password' },
+  { cls: 'dim',  text: '      bare `changepass` prompts for current + new password' },
+  { cls: 'dim',  text: '      inline:  changepass <old> <new>     (min 8 chars, must differ)' },
+  { cls: 'dim',  text: '      alias: password' },
   { cls: 'sys',  text: '  whoami                show current operator + clearance level' },
   { cls: 'sys',  text: '  who [also: online, users]    list operators currently online, sorted by clearance' },
   { cls: 'dim',  text: '      presence comes from the Supabase realtime channel; missing peers = no live socket' },
@@ -569,6 +573,82 @@ export async function doLogout(ctx) {
   return [{ cls: 'ok', text: 'SESSION TERMINATED.' }]
 }
 
+// Change the current operator's password.
+//
+// Live mode requires the active Supabase session. To re-authenticate as
+// part of the change we call `signInWithPassword({ email, password: old })`
+// against the user's stored email — GoTrue's `updateUser({ password })`
+// only works on an active session and we want to validate the OLD password
+// anyway. (Email is recoverable from the JWT-decoded `user.email`.)
+//
+// DEMO mode is not supported — there's no auth to update.
+//
+// Returns { lines, prompt } when called with no args so App.jsx can drive
+// the interactive "OLD PASSWORD: / NEW PASSWORD:" prompts, or just `lines`
+// when called inline with both args.
+export async function doChangePassword(args, ctx) {
+  if (!ctx.isConfigured) {
+    return [{ cls: 'err', text: 'PASSWORD CHANGE unavailable in DEMO mode.' }]
+  }
+  if (!ctx.user) {
+    return [{ cls: 'err', text: 'PASSWORD CHANGE failed: not authenticated.' }]
+  }
+
+  const email = ctx.user.email
+
+  // Inline: changepass <old> <new>
+  if (args.length >= 2) {
+    const oldPw = args[0]
+    const newPw = args[1]
+    return await _doPasswordChange(email, oldPw, newPw)
+  }
+
+  // Interactive: caller (App.jsx) will read prompts and submit
+  return {
+    lines: [
+      { cls: 'ok', text: 'CHANGE PASSWORD — confirm current credentials, then pick a new one.' },
+      { cls: 'dim', text: 'tip: you can also type `changepass <old> <new>` in one line.' }
+    ],
+    prompt: 'change-password'   // signal — App.jsx switches into changepass mode
+  }
+}
+
+// Shared core: verify the old password by signing in on a fresh client, then
+// update via the same client. The fresh client doesn't touch the SPA's
+// session storage (persistSession:false), so the operator stays logged in
+// throughout.
+async function _doPasswordChange(email, oldPw, newPw) {
+  if (!newPw || newPw.length < 8) {
+    return [{ cls: 'err', text: 'PASSWORD CHANGE failed: new password must be at least 8 characters.' }]
+  }
+  if (oldPw === newPw) {
+    return [{ cls: 'err', text: 'PASSWORD CHANGE failed: new password matches the old one.' }]
+  }
+
+  const { createClient } = await import('@supabase/supabase-js')
+  const { SUPABASE_URL: url, SUPABASE_ANON_KEY: anonKey } = await import('../supabaseClient')
+  if (!url || !anonKey) {
+    return [{ cls: 'err', text: 'PASSWORD CHANGE failed: cannot build a throwaway client (no Supabase URL/key).' }]
+  }
+  const throwaway = createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  })
+
+  const { error: signInErr } = await throwaway.auth.signInWithPassword({ email, password: oldPw })
+  if (signInErr) {
+    return [{ cls: 'err', text: `PASSWORD CHANGE failed: current password rejected — ${signInErr.message}` }]
+  }
+  const { error: updErr } = await throwaway.auth.updateUser({ password: newPw })
+  if (updErr) {
+    return [{ cls: 'err', text: `PASSWORD CHANGE failed: ${updErr.message}` }]
+  }
+  await throwaway.auth.signOut()
+  return [
+    { cls: 'ok', text: 'PASSWORD UPDATED.' },
+    { cls: 'dim', text: 'your other sessions were not invalidated — log out of those devices manually.' }
+  ]
+}
+
 // delete <num> — check eligibility (you created it OR your clearance >= the
 // record's required clearance) and, if allowed, ask the operator to type
 // "I'm sure" before the row is removed.
@@ -915,6 +995,9 @@ export async function runCommand(raw, ctx) {
       return doDelete(args, ctx)
     case 'logout':
       return doLogout(ctx)
+    case 'changepass':
+    case 'password':
+      return doChangePassword(args, ctx)
     case 'whoami': {
       if (!ctx.user) return [{ cls: 'dim', text: 'not authenticated.' }]
       let username = ''

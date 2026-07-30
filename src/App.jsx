@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { supabase, isConfigured } from './supabaseClient'
-import { runCommand, doLogin, doRegister, doDeleteConfirm, fetchMessage, fetchInbox, doMarkRead, CREATE_FIELDS, finalizeCreate, importFile, getClearance } from './terminal/commands'
+import { runCommand, doLogin, doRegister, doDeleteConfirm, fetchMessage, fetchInbox, doMarkRead, CREATE_FIELDS, finalizeCreate, importFile, getClearance, doChangePassword } from './terminal/commands'
 import { demoStore } from './store'
 import { openDossierWindow } from './dossierWindow'
 import { openEditorWindow } from './editorWindow'
@@ -71,7 +71,7 @@ function fmt(v) {
 export default function App() {
   const [lines, setLines] = useState([])
   const [input, setInput] = useState('')
-  // mode: normal | login-email | login-pass | wizard | confirm-delete
+  // mode: normal | login-email | login-pass | wizard | confirm-delete | change-pw-old | change-pw-new
   const [mode, setMode] = useState('normal')
   const [user, setUser] = useState(null)
   const [history, setHistory] = useState([])
@@ -222,6 +222,8 @@ export default function App() {
     if (mode === 'register-pass') return 'PASSWORD:'
     if (mode === 'register-level') return 'CLEARANCE [1-4]:'
     if (mode === 'register-username') return 'USERNAME:'
+    if (mode === 'change-pw-old') return 'OLD PASSWORD:'
+    if (mode === 'change-pw-new') return 'NEW PASSWORD:'
     if (mode === 'confirm-delete') return 'CONFIRM>'
     const name = user ? (user.email || 'admin').split('@')[0] : 'guest'
     return `${name}@CCDT:~$`
@@ -277,6 +279,35 @@ export default function App() {
       pending.current.regPass = pw
       append([{ cls: 'echo', text: `EMAIL: ${pending.current.regEmail}` }, { cls: 'echo', text: 'PASSWORD: ********' }])
       setMode('register-level')
+      return
+    }
+    // ----- change password interactive prompts -----
+    if (mode === 'change-pw-old') {
+      const v = value
+      if (!v) {
+        append([{ cls: 'err', text: 'OLD PASSWORD REQUIRED' }])
+        return
+      }
+      pending.current.cpOld = v
+      append([{ cls: 'echo', text: 'OLD PASSWORD: ********' }])
+      setMode('change-pw-new')
+      append([{ cls: 'promptline', text: 'NEW PASSWORD (min 8 chars):' }])
+      return
+    }
+    if (mode === 'change-pw-new') {
+      const v = value
+      if (!v) {
+        append([{ cls: 'err', text: 'NEW PASSWORD REQUIRED' }])
+        return
+      }
+      const old = pending.current.cpOld
+      append([{ cls: 'echo', text: 'NEW PASSWORD: ********' }])
+      pending.current.cpOld = ''
+      pending.current.cpNew = ''
+      setMode('normal')
+      // Inline form — commands.js handles the rest
+      const res = await doChangePassword([old, v], ctx())
+      append(res)
       return
     }
     if (mode === 'register-level') {
@@ -466,6 +497,14 @@ export default function App() {
       setWizard(res.wizard)
       setMode('wizard')
       append([{ cls: 'promptline', text: CREATE_FIELDS[res.wizard.idx].prompt }])
+    }
+
+    // change-password — start a 2-step prompt flow
+    if (!Array.isArray(res) && res.prompt === 'change-password') {
+      pending.current.cpOld = ''
+      pending.current.cpNew = ''
+      setMode('change-pw-old')
+      append([{ cls: 'promptline', text: 'OLD PASSWORD:' }])
     }
 
     // delete — enter confirm-delete mode, awaiting "I'm sure"

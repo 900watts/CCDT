@@ -12,5 +12,7 @@ const looksReal =
   !url.includes('YOUR-PROJECT-REF')
 
 export const isConfigured = Boolean(looksReal && anonKey)
+export const SUPABASE_URL = url
+export const SUPABASE_ANON_KEY = anonKey
 
 export const supabase = isConfigured ? createClient(url, anonKey) : null
