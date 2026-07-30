@@ -11,6 +11,7 @@ import {
   demoUsernames, demoMessages,
   demoAddMessage, demoMarkRead
 } from '../store'
+import { getOnlinePeers } from '../presence'
 
 const DEMO_USER = { id: 'demo-agent', email: 'agent@archive.local' }
 
@@ -108,6 +109,8 @@ const HELP = [
   { cls: 'dim',  text: '      or inline: register me@corp.com hunter2 3   (clearance 1-4)' },
   { cls: 'sys',  text: '  logout                end the current session' },
   { cls: 'sys',  text: '  whoami                show current operator + clearance level' },
+  { cls: 'sys',  text: '  who [also: online, users]    list operators currently online, sorted by clearance' },
+  { cls: 'dim',  text: '      presence comes from the Supabase realtime channel; missing peers = no live socket' },
   { cls: 'dim', text: '' },
 
   { cls: 'ok', text: '▸ NAVIGATION' },
@@ -339,6 +342,117 @@ async function list(args, ctx) {
         (r.department ? ` — ${r.department}` : '')
     })
   }
+  return out
+}
+
+// Pulls the email->username/clearance mapping for peers that haven't broadcast
+// (or whose broadcast arrived before Supabase auth populated `user_metadata`).
+async function _enrichPeers(supabase, profiles) {
+  if (!supabase || !profiles?.length) return profiles
+  const ids = profiles.map((p) => p?.id).filter(Boolean)
+  if (!ids.length) return profiles
+  const { data } = await supabase
+    .from('users')
+    .select('id,username,email,clearance_level')
+    .in('id', ids)
+    .catch(() => ({ data: null }))
+  if (!data) return profiles
+  const byId = new Map(data.map((u) => [u.id, u]))
+  return profiles.map((p) => {
+    if (!p || p.id) return p
+    return p
+  }).map((p) => {
+    if (!p?.id) return p
+    const row = byId.get(p.id)
+    if (!row) return p
+    return {
+      ...p,
+      username: p.username || row.username || null,
+      email: p.email || row.email || null,
+      clearance_level: Number(p.clearance_level) || Number(row.clearance_level) || 1
+    }
+  })
+}
+
+async function who(args, ctx) {
+  // Available even without auth — DEMO mode shows the local tab + any
+  // real session; authenticated mode shows everyone connected.
+  const peers = getOnlinePeers()
+
+  // Enrich from public.users so peers appear with their username even when
+  // their broadcast raced ahead of the auth metadata hydration.
+  let visible = peers.filter((p) => p && p.profile && p.profile.id)
+  if (ctx.isConfigured) {
+    visible = await _enrichPeers(ctx.supabase, visible.map((p) => p.profile))
+    // Re-attach metadata to each peer so the renderer can tell self from others.
+    visible = peers.map((p) => ({ peer: p, profile: visible.find((x) => x && x.id === p.profile?.id) || p.profile }))
+  } else {
+    visible = peers.map((p) => ({ peer: p, profile: p.profile }))
+  }
+
+  // De-dupe: same user may have multiple tabs.
+  const seen = new Set()
+  const deduped = []
+  for (const row of visible) {
+    const id = row?.profile?.id || row?.peer?.tab
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    deduped.push(row)
+  }
+
+  if (!deduped.length) {
+    return [{
+      cls: 'dim',
+      text: 'No operators are online right now. (Presence requires a real-time Supabase connection.)'
+    }]
+  }
+
+  // Sort by clearance desc, then username.
+  deduped.sort((a, b) => {
+    const ca = Number(a.profile?.clearance_level) || 0
+    const cb = Number(b.profile?.clearance_level) || 0
+    if (cb !== ca) return cb - ca
+    const ua = (a.profile?.username || a.profile?.email || '').toLowerCase()
+    const ub = (b.profile?.username || b.profile?.email || '').toLowerCase()
+    return ua.localeCompare(ub)
+  })
+
+  const myPeerId = peers.find((p) => p.self)?.tab
+  const out = [
+    { cls: 'ok',  text: `OPERATORS ONLINE (${deduped.length})` },
+    { cls: 'dim', text: 'NAME'.padEnd(16) + 'CLEARANCE'.padEnd(11) + 'CHANNEL'.padEnd(8) + 'EMAIL / DEPARTMENT' }
+  ]
+
+  for (const { peer, profile } of deduped) {
+    const isMe = peer.tab === myPeerId
+    const tag = isMe ? '◀ self' : ''
+    const name =
+      (profile?.username && '@' + profile.username) ||
+      profile?.email ||
+      '(unnamed)'
+    const clearance = Number(profile?.clearance_level) || 1
+    const clearanceTag =
+      clearance >= 4 ? 'L4 TOP SECRET' :
+      clearance === 3 ? 'L3 SECRET' :
+      clearance === 2 ? 'L2 CONFIDENTIAL' :
+                        'L1 PUBLIC'
+    const channel = isMe ? 'realtime' : 'realtime'
+    const email = profile?.email ? profile.email : ''
+    out.push({
+      cls: isMe ? 'ok' : 'sys',
+      text:
+        `  ${name.padEnd(15)} ` +
+        `${clearanceTag.padEnd(11)} ` +
+        `${channel.padEnd(8)} ` +
+        `${email}` +
+        (tag ? `  ${tag}` : '')
+    })
+  }
+  out.push({ cls: 'dim', text: '' })
+  out.push({
+    cls: 'dim',
+    text: 'Tip: presence comes from the realtime channel. A tab without live websocket counts as offline.'
+  })
   return out
 }
 
@@ -737,6 +851,10 @@ export async function runCommand(raw, ctx) {
       return list(args, ctx)
     case 'search':
       return search(args, ctx)
+    case 'who':
+    case 'online':
+    case 'users':
+      return who(args, ctx)
     case 'create': {
       const guard = authGuard(ctx)
       if (guard) return guard

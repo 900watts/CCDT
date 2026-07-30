@@ -6,6 +6,7 @@ import { openDossierWindow } from './dossierWindow'
 import { openEditorWindow } from './editorWindow'
 import { md2html } from './markdown'
 import { openInboxWindow, openComposeWindow, openMessageWindow } from './mailboxWindow'
+import { bindPresence, unbindPresence } from './presence'
 import DatabaseView from './DatabaseView'
 
 const CLASS_COLOR = {
@@ -194,6 +195,20 @@ export default function App() {
     const t = setInterval(poll, 10000)
     return () => { stopped = true; clearInterval(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isConfigured])
+
+  // ---- Presence: broadcast join/leave/heartbeat ----
+  // When the user logs in, `bindPresence()` opens the realtime channel,
+  // announces us with a join, and starts a 15s heartbeat + 30s stale-prune.
+  // On logout, `unbindPresence()` closes the channel and clears local state.
+  // The `who`/`online`/`users` terminal command reads from this module.
+  useEffect(() => {
+    if (!isConfigured || !user) {
+      unbindPresence()
+      return
+    }
+    bindPresence(supabase, user)
+    return () => unbindPresence()
   }, [user, isConfigured])
 
   useEffect(() => {
