@@ -53,7 +53,35 @@ html, body, #root {
   text-transform: uppercase;
 }
 
-.tabs { display: flex; }
+.tabs { display: flex; align-items: stretch; }
+.tabs__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 14px 4px 12px;
+  border-right: 1px solid var(--line);
+  color: var(--fg-bright);
+  user-select: none;
+}
+.tabs__mark {
+  height: 28px;
+  width: 28px;
+  display: block;
+  border-radius: 4px;
+  /* mild phosphor glow so the badge feels like part of the terminal */
+  filter: drop-shadow(0 0 6px rgba(56, 255, 154, 0.25));
+  transition: filter 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
+.tabs__brand:hover .tabs__mark {
+  filter: drop-shadow(0 0 10px rgba(56, 255, 154, 0.55));
+  transform: rotate(-6deg);
+}
+.tabs__name {
+  font-size: 12px;
+  letter-spacing: 2px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
 .tab {
   background: transparent;
   border: none;
@@ -108,6 +136,46 @@ html, body, #root {
 .line.echo { color: var(--fg-dim); }
 .line.echo .prompt { color: var(--fg); }
 .line.promptline { color: var(--fg-bright); font-weight: bold; margin-top: 6px; }
+.line.logo { margin: 4px 0 6px; padding: 0; white-space: normal; }
+.line.logo .ccdt-boot {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 14px 6px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--fg);
+  background:
+    linear-gradient(180deg, rgba(56,255,154,0.04), transparent 70%),
+    var(--panel);
+  animation: ccdt-boot-in 380ms var(--ease-out) both;
+}
+.line.logo .ccdt-boot__img {
+  height: 64px;
+  width: auto;
+  display: block;
+  filter: drop-shadow(0 0 8px rgba(56, 255, 154, 0.35));
+}
+.line.logo .ccdt-boot__meta { display: flex; flex-direction: column; gap: 4px; }
+.line.logo .ccdt-boot__tagline {
+  color: var(--fg-bright);
+  font-weight: 700;
+  letter-spacing: 3px;
+  font-size: 12px;
+}
+.line.logo .ccdt-boot__sub {
+  color: var(--fg-dim);
+  letter-spacing: 1.5px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+@keyframes ccdt-boot-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .line.logo .ccdt-boot { animation: none; }
+  .tabs__brand:hover .tabs__mark { transform: none; }
+}
 
 .dossier {
   border: 1px solid var(--line);

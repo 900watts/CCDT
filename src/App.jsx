@@ -111,11 +111,16 @@ export default function App() {
   useEffect(() => {
     const sep = '─'.repeat(62)
     append([
+      { cls: 'logo', pinned: true, html: `
+        <div class="ccdt-boot">
+          <img class="ccdt-boot__img" src="/ccdt-logo-white.png" alt="CCDT — Corporate Central Data Terminal" />
+          <div class="ccdt-boot__meta">
+            <div class="ccdt-boot__tagline">SECURE · CONTAIN · PROTECT</div>
+            <div class="ccdt-boot__sub">Corporate Central Data Terminal · v1.0</div>
+          </div>
+        </div>
+      ` },
       { cls: 'ok', text: `${sep}`, pinned: true },
-      { cls: 'ok', text: `-------------------------- CCDT  V1.0 ---------------------------`, pinned: true },
-      { cls: 'ok', text: '', pinned: true },
-      { cls: 'ok', text: 'SECURE, CONTAIN, PROTECT', pinned: true },
-      { cls: 'ok', text: 'Corporate Central Data Terminal', pinned: true },
       { cls: 'ok', text: '', pinned: true },
       { cls: 'dim', text: `Access Time: ${accessTime()}`, pinned: true },
       { cls: 'ok', text: '', pinned: true },
@@ -566,6 +571,10 @@ export default function App() {
     <div className="terminal">
       <div className="terminal__bar">
         <div className="tabs">
+          <div className="tabs__brand" title="CCDT — Corporate Central Data Terminal">
+            <img src="/ccdt-mark.png" alt="" className="tabs__mark" />
+            <span className="tabs__name">CCDT</span>
+          </div>
           <button
             className={`tab${view === 'terminal' ? ' tab--active' : ''}`}
             onClick={() => setView('terminal')}
@@ -589,6 +598,13 @@ export default function App() {
           {rendered.map((l) =>
             l.cls === 'dossier' ? (
               <Dossier key={l.id} data={l.data} />
+            ) : l.html ? (
+              <div
+                key={l.id}
+                className={`line ${l.cls || 'sys'}`}
+                data-fresh={l.fresh ? '' : undefined}
+                dangerouslySetInnerHTML={{ __html: l.html }}
+              />
             ) : (
               <div key={l.id} className={`line ${l.cls || 'sys'}`} data-fresh={l.fresh ? '' : undefined}>
                 {l.text}
