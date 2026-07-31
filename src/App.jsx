@@ -175,7 +175,28 @@ export default function App() {
         fresh.forEach((r) => seenMailIds.current.add(r.id))
 
         // O5 council broadcast takes priority — freeze the screen first.
-        const o5Fresh = fresh.filter((r) => String(r.priority || '').toLowerCase() === 'o5')
+        // Filter out broadcasts the CURRENT operator sent themselves — the
+        // sender doesn't need a popup for their own transmission. We compare
+        // by email since the peek_inbox RPC doesn't expose sender_id (only
+        // sender_email + sender_username).
+        const meEmail = String(ctx().user?.email || '').toLowerCase()
+        const isOwnBroadcast = (r) => {
+          if (String(r.priority || '').toLowerCase() !== 'o5') return false
+          const se = String(r.sender_email || '').toLowerCase()
+          return meEmail && se === meEmail
+        }
+        const o5Fresh = fresh.filter((r) => !isOwnBroadcast(r))
+        // Own broadcasts — never popup, but log a quiet success line so the
+        // sender sees the broadcast went out without freezing their own screen.
+        const o5Own = fresh.filter(isOwnBroadcast)
+        if (o5Own.length) {
+          o5Own.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+          const m = o5Own[0]
+          append([
+            { cls: 'ok',  text: `▶ O5 BROADCAST SENT — "${m.subject || '(no subject)'}"` },
+            { cls: 'dim', text: `  priority:o5 · ack by opening mail inbox` }
+          ])
+        }
         if (o5Fresh.length) {
           // Pick the newest O5 message as the headline.
           o5Fresh.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
@@ -193,6 +214,9 @@ export default function App() {
           }])
           return
         }
+        // If we hit the o5Own branch above, we already logged and shouldn't
+        // re-fall-through to the regular mail notice.
+        if (o5Own.length) return
 
         // Is a mailbox window currently open?
         const mailboxOpen = !!document.querySelector('.winbox.ccdt-win--mail')

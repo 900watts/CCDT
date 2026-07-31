@@ -1082,11 +1082,25 @@ html, body, #root {
     0 0 40px rgba(255, 77, 109, 0.35),
     0 0 80px rgba(255, 77, 109, 0.18);
   position: relative;
-  animation: ccdt-o5-card-in 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation:
+    ccdt-o5-card-in 220ms cubic-bezier(0.23, 1, 0.32, 1) both,
+    ccdt-o5-card-flash 1.6s ease-out 1 both;
 }
 @keyframes ccdt-o5-card-in {
   from { opacity: 0; transform: scale(0.96); }
   to   { opacity: 1; transform: scale(1); }
+}
+/* Flash 4 times after appearance: brighten border + outer glow then settle.
+   The animation runs once (iteration-count: 1) so it doesn't keep blinking
+   for the rest of the 10s the popup is up. */
+@keyframes ccdt-o5-card-flash {
+  0%   { border-color: #ff4d6d; box-shadow: 0 0 0 1px rgba(255,77,109,0.25) inset, 0 0 40px rgba(255,77,109,0.35), 0 0 80px rgba(255,77,109,0.18); }
+  10%  { border-color: #ffe066; box-shadow: 0 0 0 2px rgba(255,224,102,0.55) inset, 0 0 80px rgba(255,224,102,0.85), 0 0 160px rgba(255,224,102,0.45); }
+  20%  { border-color: #ff4d6d; box-shadow: 0 0 0 1px rgba(255,77,109,0.25) inset, 0 0 40px rgba(255,77,109,0.35), 0 0 80px rgba(255,77,109,0.18); }
+  35%  { border-color: #ffe066; box-shadow: 0 0 0 2px rgba(255,224,102,0.55) inset, 0 0 80px rgba(255,224,102,0.85), 0 0 160px rgba(255,224,102,0.45); }
+  50%  { border-color: #ff4d6d; box-shadow: 0 0 0 1px rgba(255,77,109,0.25) inset, 0 0 40px rgba(255,77,109,0.35), 0 0 80px rgba(255,77,109,0.18); }
+  65%  { border-color: #ffe066; box-shadow: 0 0 0 2px rgba(255,224,102,0.55) inset, 0 0 80px rgba(255,224,102,0.85), 0 0 160px rgba(255,224,102,0.45); }
+  100% { border-color: #ff4d6d; box-shadow: 0 0 0 1px rgba(255,77,109,0.25) inset, 0 0 40px rgba(255,77,109,0.35), 0 0 80px rgba(255,77,109,0.18); }
 }
 .ccdt-o5-icon {
   width: 56px;
@@ -1109,6 +1123,17 @@ html, body, #root {
   color: #ff4d6d;
   text-transform: uppercase;
   margin: 0 0 8px;
+  /* Flash the warning text itself 3 times after appearance, then settle. */
+  animation: ccdt-o5-title-flash 1.6s ease-out 1 both;
+}
+@keyframes ccdt-o5-title-flash {
+  0%   { color: #ff4d6d; }
+  10%  { color: #ffe066; text-shadow: 0 0 8px rgba(255, 224, 102, 0.9); }
+  20%  { color: #ff4d6d; text-shadow: none; }
+  35%  { color: #ffe066; text-shadow: 0 0 8px rgba(255, 224, 102, 0.9); }
+  50%  { color: #ff4d6d; text-shadow: none; }
+  65%  { color: #ffe066; text-shadow: 0 0 8px rgba(255, 224, 102, 0.9); }
+  100% { color: #ff4d6d; text-shadow: none; }
 }
 .ccdt-o5-sub {
   font-size: 11px;
