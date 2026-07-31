@@ -647,10 +647,16 @@ html, body, #root {
   cursor: pointer;
 }
 
-/* Page (the editable area on a white card) */
+/* Page (the editable area on a white card).
+   Critical: this is NOT a flex container — using `display: flex` with
+   the default `align-items: stretch` capped the paper at the page's
+   height, so content beyond that point bled onto the grey backdrop.
+   With `display: block` + `margin: 0 auto` the paper grows naturally
+   with its content (driven by `min-height: 100%` to fill an empty
+   editor). */
 .ccdt-edit__page {
   flex: 1; min-height: 0;
-  display: flex; justify-content: center;
+  display: block;
   padding: 24px 16px;
   overflow-y: auto;
   background: #ececec;
@@ -660,7 +666,8 @@ html, body, #root {
   color: #1a1a1a;
   width: 100%;
   max-width: 880px;
-  min-height: 600px;
+  margin: 0 auto;
+  min-height: 100%;           /* fill the page when content is small */
   padding: 56px 72px;
   font-family: "Calibri", "Segoe UI", "Liberation Sans", sans-serif;
   font-size: 14px;
@@ -669,6 +676,7 @@ html, body, #root {
   box-shadow: 0 1px 4px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.08);
   caret-color: #1a1a1a;
   transition: box-shadow 200ms var(--ease-out);
+  box-sizing: border-box;
 }
 .ccdt-edit__paper:focus { box-shadow: 0 1px 6px rgba(0,0,0,0.18), 0 6px 24px rgba(0,0,0,0.10); }
 .ccdt-edit__paper:empty::before {
