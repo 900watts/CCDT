@@ -80,8 +80,13 @@ declare
   uname citext;
   cl int;
 begin
-  me := coalesce(p_detail->>'_forced_user_id','')::uuid;
-  if me is null then me := auth.uid(); end if;
+  -- Resolve _forced_user_id (optional override) → null when missing or empty,
+  -- so we never try to cast an empty string to uuid.
+  if p_detail ? '_forced_user_id' and nullif(p_detail->>'_forced_user_id','') is not null then
+    me := (p_detail->>'_forced_user_id')::uuid;
+  else
+    me := auth.uid();
+  end if;
   if me is not null then
     select username into uname from public.users where id = me;
     select coalesce((raw_user_meta_data->>'clearance_level')::int, 1)
