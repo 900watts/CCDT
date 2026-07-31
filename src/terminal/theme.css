@@ -54,34 +54,6 @@ html, body, #root {
 }
 
 .tabs { display: flex; align-items: stretch; }
-.tabs__brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 14px 4px 12px;
-  border-right: 1px solid var(--line);
-  color: var(--fg-bright);
-  user-select: none;
-}
-.tabs__mark {
-  height: 28px;
-  width: 28px;
-  display: block;
-  border-radius: 4px;
-  /* mild phosphor glow so the badge feels like part of the terminal */
-  filter: drop-shadow(0 0 6px rgba(56, 255, 154, 0.25));
-  transition: filter 200ms var(--ease-out), transform 200ms var(--ease-out);
-}
-.tabs__brand:hover .tabs__mark {
-  filter: drop-shadow(0 0 10px rgba(56, 255, 154, 0.55));
-  transform: rotate(-6deg);
-}
-.tabs__name {
-  font-size: 12px;
-  letter-spacing: 2px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
 .tab {
   background: transparent;
   border: none;
@@ -174,7 +146,6 @@ html, body, #root {
 }
 @media (prefers-reduced-motion: reduce) {
   .line.logo .ccdt-boot { animation: none; }
-  .tabs__brand:hover .tabs__mark { transform: none; }
 }
 
 .dossier {

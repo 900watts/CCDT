@@ -571,10 +571,6 @@ export default function App() {
     <div className="terminal">
       <div className="terminal__bar">
         <div className="tabs">
-          <div className="tabs__brand" title="CCDT — Corporate Central Data Terminal">
-            <img src="/ccdt-mark.png" alt="" className="tabs__mark" />
-            <span className="tabs__name">CCDT</span>
-          </div>
           <button
             className={`tab${view === 'terminal' ? ' tab--active' : ''}`}
             onClick={() => setView('terminal')}
