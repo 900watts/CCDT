@@ -1,0 +1,43 @@
+feat(editor): Word 2026 white-on-black look + ribbon toolbar + save dialog
+
+Dossier window:
+- White "page" card centered on a light grey backdrop
+- Black ink, Calibri sans-serif body, Consolas mono for headers/badges
+- Classification banner is a yellow strip like a clearance placard
+- Headings underline, blockquotes get a left border + grey bg
+
+Editor window:
+- White page area as contenteditable div (replaces the textarea) so
+  font/size/B/I/U/color/headings/lists/links/photos can be applied
+  directly via document.execCommand to the user's selection
+- Word-2026 ribbon at the top:
+    file row: [CCDT -- EDIT DOCUMENT] [SAVE] [CANCEL]
+    format row: [Font v] [Size v] | B I U S | [A color] [A highlight] |
+                H1 H2 H3 | L C R | bullet 1. quote | link photo rule
+- All toolbar buttons white-on-grey with hover/press micro-interactions
+- Bottom strip keeps the photo strip + status line
+
+Save dialog (modal overlay):
+- Triggered by SAVE button on the ribbon
+- Same archive-number / title / classification / department / tags
+  fields, replacing the old direct-save button
+- SAVE / CANCEL buttons; backdrop click also cancels
+- After SAVE: persist via insertRecord / updateRecord, then close
+  the entire editor (which drops the dialog with it). Back at the
+  terminal in ~600 ms.
+- Re-opens automatically if save fails, so inputs aren't lost
+
+HTML to Markdown serializer (src/htmlToMarkdown.js):
+- New small module that walks the contenteditable tree and emits back
+  the same markdown subset md2html consumes.
+- Bold to **text**, italic to *text*, underline to <u>text</u> (HTML
+  round-trip), strikethrough to ~~text~~, headings to # / ## / ###,
+  lists to - / 1., blockquote to >, code to single-backtick, links to
+  [t](u), images to ![a](u).
+- Photos inserted via photo or drag-drop still become image-link lines
+  on save.
+
+Also dropped the (unused) CLASS_COLOR map from dossierWindow.js since
+the banner colour is now driven by CSS, and reworked the ribbon-button
+selection-mousedown to use event.preventDefault() so clicking a toolbar
+button doesn't lose the editor's selection.

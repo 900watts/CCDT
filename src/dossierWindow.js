@@ -5,13 +5,6 @@ import 'winbox/dist/css/winbox.min.css'
 import { md2html } from './markdown'
 import { nextZIndex, registerWindow, focusIfExists } from './windowStack'
 
-const CLASS_COLOR = {
-  SECRET: '#ff4d6d',
-  'TOP SECRET': '#ff4d6d',
-  CONFIDENTIAL: '#ffd166',
-  PUBLIC: '#38ff9a'
-}
-
 // Same map the SQL function `public.required_clearance(text)` uses.
 const CLASS_LEVEL = {
   PUBLIC: 1,
@@ -38,7 +31,6 @@ export function openDossierWindow(row, opts = {}) {
   const dedupKey = 'dossier:' + row.archive_number
   if (focusIfExists(dedupKey)) return null
   const cls = (row.classification || 'PUBLIC').toUpperCase()
-  const color = CLASS_COLOR[cls] || '#38ff9a'
   const tags = Array.isArray(row.tags) ? row.tags.join(', ') : row.tags || '—'
   const created = row.created_at
     ? new Date(row.created_at).toLocaleString(undefined, {
@@ -70,9 +62,7 @@ export function openDossierWindow(row, opts = {}) {
 
   const html = `
     <div class="ccdt-dossier">
-      <div class="ccdt-dossier__banner" style="color:${color};border-color:${color}">
-        ${esc(cls)} — ${esc(clearanceNote)}
-      </div>
+      <div class="ccdt-dossier__banner">${esc(cls)} — ${esc(clearanceNote)}</div>
       <div class="ccdt-dossier__num">ARCHIVE ${esc(row.archive_number)}</div>
       <div class="ccdt-dossier__title">${esc(row.title)}</div>
       <div class="ccdt-dossier__meta"><span>Department</span>${esc(row.department || '—')}</div>
@@ -85,15 +75,15 @@ export function openDossierWindow(row, opts = {}) {
 
   const wb = new WinBox({
     title: `ARCHIVE ${row.archive_number} — ${esc(row.title).slice(0, 40)}`,
-    class: 'ccdt-win',
+    class: 'ccdt-win ccdt-win--dossier',
     html,
-    background: '#0a0f12',
+    background: '#2b2b2b',
     border: '2px solid #11331f',
     x: 'center',
     y: 'center',
-    width: '640px',
-    height: '72%',
-    minheight: 240,
+    width: '74%',
+    height: '86%',
+    minheight: 480,
     index: nextZIndex()
   })
   registerWindow(dedupKey, wb)

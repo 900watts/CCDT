@@ -258,42 +258,155 @@ html, body, #root {
 .dbcard__title { color: var(--fg); font-size: 14px; }
 .dbcard__dept { color: var(--fg-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
 
-/* ───────── WinBox dossier window ───────── */
-.wb-header { background: #0a0f12 !important; color: var(--fg-bright) !important; }
-.wb-body { background: #0a0f12 !important; }
-.ccdt-dossier { padding: 16px 18px; color: var(--fg); font-family: inherit; }
-.ccdt-dossier__banner {
-  font-size: 11px; letter-spacing: 2px; font-weight: bold;
-  padding: 4px 10px; border: 1px solid; display: inline-block; margin-bottom: 10px;
+/* ───────── WinBox dossier window — Word 2026 white-on-black ───────── */
+/* Override the WinBox chrome so the dossier reads as a printed page on a
+   dark terminal: white paper, black ink, monospace (Courier New). */
+.ccdt-win .wb-header {
+  background: #0a0f12 !important;
+  color: var(--fg-bright) !important;
+  border-bottom: 1px solid var(--line) !important;
 }
-.ccdt-dossier__num { color: var(--fg-dim); font-size: 12px; letter-spacing: 1px; }
-.ccdt-dossier__title { color: var(--fg-bright); font-size: 18px; font-weight: bold; margin: 4px 0 10px; }
-.ccdt-dossier__meta { display: flex; gap: 10px; font-size: 12px; margin-top: 4px; }
-.ccdt-dossier__meta span { color: var(--fg-dim); min-width: 90px; text-transform: uppercase; letter-spacing: 1px; }
-.ccdt-dossier__rule { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
+.ccdt-win .wb-body { background: #2b2b2b !important; }
+
+.ccdt-dossier {
+  /* The "page" is a wide white card centered on a dark grey bg, mirroring
+     Word's Print Layout look. */
+  margin: 16px auto;
+  padding: 56px 72px 64px;
+  background: #ffffff;
+  color: #000000;
+  font-family: "Calibri", "Segoe UI", "Liberation Sans", "DejaVu Sans", sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 920px;
+  min-height: 100%;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  box-sizing: border-box;
+}
+.ccdt-dossier__banner {
+  font-size: 12px; letter-spacing: 3px; font-weight: 700;
+  padding: 8px 16px; display: inline-block;
+  margin-bottom: 14px;
+  color: #000000;
+  background: #f3c623;
+  border: 1px solid #000;
+  text-transform: uppercase;
+  font-family: "Consolas", "Courier New", monospace;
+}
+.ccdt-dossier__num {
+  color: #000000;
+  font-size: 12px;
+  letter-spacing: 2px;
+  font-family: "Consolas", "Courier New", monospace;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.ccdt-dossier__title {
+  color: #000000;
+  font-size: 26px;
+  font-weight: 700;
+  margin: 6px 0 14px;
+  line-height: 1.25;
+  font-family: "Calibri", "Segoe UI", sans-serif;
+}
+.ccdt-dossier__meta {
+  display: flex; gap: 12px; font-size: 12px; margin-top: 4px;
+  color: #1a1a1a;
+}
+.ccdt-dossier__meta span {
+  color: #000000;
+  min-width: 110px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 10px;
+  border-bottom: 1px solid #000;
+  padding-bottom: 1px;
+}
+.ccdt-dossier__rule {
+  border: none;
+  border-top: 1.5px solid #000;
+  margin: 16px 0;
+}
 .ccdt-dossier__content {
-  white-space: normal; word-break: break-word;
-  color: var(--fg); font-family: inherit; font-size: 13px; line-height: 1.6;
+  white-space: normal;
+  word-break: break-word;
+  color: #000000;
+  font-family: "Calibri", "Segoe UI", "Liberation Sans", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
   margin: 0;
 }
-.ccdt-dossier__content h1 { font-size: 19px; margin: 12px 0 6px; color: var(--fg); }
-.ccdt-dossier__content h2 { font-size: 16px; margin: 10px 0 5px; color: var(--fg); }
-.ccdt-dossier__content h3 { font-size: 14px; margin: 8px 0 4px; color: var(--fg); }
-.ccdt-dossier__content p { margin: 6px 0; }
-.ccdt-dossier__content ul { margin: 6px 0 6px 20px; padding: 0; }
-.ccdt-dossier__content li { margin: 2px 0; }
-.ccdt-dossier__content blockquote {
-  margin: 8px 0; padding: 6px 12px; border-left: 3px solid var(--line);
-  color: var(--fg-dim); background: rgba(255,255,255,0.02);
+.ccdt-dossier__content h1 {
+  font-size: 22px;
+  margin: 18px 0 8px;
+  color: #000;
+  font-weight: 700;
+  border-bottom: 1px solid #000;
+  padding-bottom: 2px;
 }
-.ccdt-dossier__content a { color: var(--pub); }
+.ccdt-dossier__content h2 {
+  font-size: 18px;
+  margin: 14px 0 6px;
+  color: #000;
+  font-weight: 700;
+}
+.ccdt-dossier__content h3 {
+  font-size: 15px;
+  margin: 12px 0 4px;
+  color: #000;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.ccdt-dossier__content p { margin: 6px 0; }
+.ccdt-dossier__content ul { margin: 6px 0 6px 22px; padding: 0; }
+.ccdt-dossier__content li { margin: 2px 0; }
+.ccdt-dossier__content ol { margin: 6px 0 6px 22px; padding: 0; }
+.ccdt-dossier__content blockquote {
+  margin: 10px 0;
+  padding: 8px 14px;
+  border-left: 4px solid #000;
+  color: #1a1a1a;
+  background: #f4f4f4;
+  font-style: italic;
+}
+.ccdt-dossier__content a { color: #0a4d8c; text-decoration: underline; }
+.ccdt-dossier__content code {
+  background: #f4f4f4;
+  padding: 1px 4px;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 12.5px;
+}
+.ccdt-dossier__content pre {
+  background: #f4f4f4;
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 12.5px;
+  overflow-x: auto;
+}
 .ccdt-dossier__content img {
-  max-width: 100%; border: 1px solid #11331f; margin: 8px 0; border-radius: 3px;
+  max-width: 100%;
+  border: 1px solid #ccc;
+  margin: 10px 0;
+}
+.ccdt-dossier__content strong { font-weight: 700; }
+.ccdt-dossier__content em { font-style: italic; }
+.ccdt-dossier__content u { text-decoration: underline; }
+.ccdt-dossier__content hr {
+  border: none;
+  border-top: 1px solid #000;
+  margin: 14px 0;
 }
 .ccdt-dossier__photos {
-  display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0;
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 16px;
 }
-.ccdt-dossier__photo { display: block; width: 90px; height: 90px; overflow: hidden; border: 1px solid #11331f; border-radius: 3px; }
+.ccdt-dossier__photo {
+  display: block; width: 100px; height: 100px;
+  overflow: hidden; border: 1px solid #ccc;
+}
 .ccdt-dossier__photo img { width: 100%; height: 100%; object-fit: cover; margin: 0; border: none; }
 
 /* ───────── Mailbox windows ───────── */
@@ -398,57 +511,374 @@ html, body, #root {
 }
 .ccdt-msgview__actions { display: flex; gap: 10px; margin-top: 14px; }
 
-/* ───────── Document Editor window ───────── */
-.ccdt-edit { display: flex; flex-direction: column; height: 100%; padding: 12px 14px; color: var(--fg); font-family: inherit; gap: 8px; min-height: 0; }
-.ccdt-edit__bar { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-.ccdt-edit__title { color: var(--fg-bright); font-weight: bold; letter-spacing: 2px; font-size: 13px; }
-.ccdt-edit__save { margin-left: auto; background: var(--fg); color: #05080a; border: none; padding: 6px 14px; cursor: pointer; font: inherit; font-weight: bold; letter-spacing: 1px; font-size: 12px; transition: background-color 150ms var(--ease-out), transform 150ms var(--ease-out); }
-@media (hover: hover) and (pointer: fine) {
-  .ccdt-edit__save:hover { background: var(--fg-bright); }
+/* ───────── Document Editor — Word 2026 light theme ───────── */
+/* Outside the page is light grey (the chrome backdrop), the page itself
+   is white with serif/sans body text, and the ribbon sits in a slightly
+   darker strip above the page. */
+.ccdt-win--edit .wb-header {
+  background: #f3f3f3 !important;
+  color: #1a1a1a !important;
+  border-bottom: 1px solid #c8c8c8 !important;
 }
-.ccdt-edit__save:active { transform: scale(0.97); }
-.ccdt-edit__cancel { background: transparent; color: var(--fg); border: 1px solid var(--line); padding: 6px 14px; cursor: pointer; font: inherit; letter-spacing: 1px; font-size: 12px; transition: border-color 150ms var(--ease-out), transform 150ms var(--ease-out); }
-@media (hover: hover) and (pointer: fine) {
-  .ccdt-edit__cancel:hover { border-color: var(--fg); }
+.ccdt-win--edit .wb-body {
+  background: #ececec !important;
+  padding: 0 !important;
+  display: flex;
+  flex-direction: column;
 }
-.ccdt-edit__cancel:active { transform: scale(0.97); }
-.ccdt-edit__form { display: flex; flex-direction: column; gap: 6px; }
-.ccdt-edit__lbl { display: block; font-size: 10px; color: var(--fg-dim); letter-spacing: 1px; text-transform: uppercase; }
-.ccdt-edit__lbl--half { display: inline-block; width: 49%; }
-.ccdt-edit__row { display: flex; gap: 2%; }
-.ccdt-edit__inp { display: block; width: 100%; background: #05080a; color: var(--fg-bright); border: 1px solid var(--line); padding: 5px 8px; margin-top: 3px; font: inherit; font-size: 13px; outline: none; transition: border-color 150ms var(--ease-out); }
-.ccdt-edit__inp:focus { border-color: var(--fg-dim); }
-.ccdt-edit__tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); margin-top: 4px; }
-.ccdt-edit__tab { background: transparent; border: none; color: var(--fg-dim); padding: 6px 14px; cursor: pointer; font: inherit; font-size: 11px; letter-spacing: 1px; transition: color 150ms var(--ease-out); }
-@media (hover: hover) and (pointer: fine) {
-  .ccdt-edit__tab:hover { color: var(--fg); }
+
+.ccdt-edit--word {
+  display: flex; flex-direction: column;
+  height: 100%; min-height: 0;
+  color: #1a1a1a;
+  font-family: "Calibri", "Segoe UI", "Liberation Sans", "DejaVu Sans", sans-serif;
 }
-.ccdt-edit__tab:active { transform: scale(0.97); }
-.ccdt-edit__tab--active { color: var(--fg-bright); border-bottom: 2px solid var(--fg); }
-.ccdt-edit__toolbar { display: flex; gap: 4px; flex-wrap: wrap; padding: 6px 0; }
-.ccdt-edit__toolbar button { background: #05080a; color: var(--fg); border: 1px solid var(--line); padding: 4px 10px; cursor: pointer; font: inherit; font-size: 12px; min-width: 28px; transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out), transform 150ms var(--ease-out); }
-@media (hover: hover) and (pointer: fine) {
-  .ccdt-edit__toolbar button:hover { border-color: var(--fg); background: rgba(56,255,154,0.05); }
+
+/* Ribbon */
+.ccdt-edit__ribbon {
+  background: #f9f9f9;
+  border-bottom: 1px solid #c8c8c8;
+  padding: 6px 10px 8px;
+  display: flex; flex-direction: column; gap: 6px;
+  flex: 0 0 auto;
 }
-.ccdt-edit__toolbar button:active { transform: scale(0.95); }
-.ccdt-edit__body { position: relative; flex: 1; min-height: 200px; display: flex; }
-.ccdt-edit__body textarea { width: 100%; height: 100%; background: #05080a; color: var(--fg-bright); border: 1px solid var(--line); padding: 10px 12px; font: inherit; font-size: 13px; line-height: 1.6; resize: none; outline: none; }
-.ccdt-edit__body textarea:focus { border-color: var(--fg-dim); }
-.ccdt-edit__preview { width: 100%; height: 100%; overflow-y: auto; background: #05080a; border: 1px solid var(--line); padding: 14px 18px; color: var(--fg); }
-.ccdt-edit__preview h1, .ccdt-edit__preview h2, .ccdt-edit__preview h3 { color: var(--fg-bright); margin: 14px 0 6px; }
-.ccdt-edit__preview h1 { font-size: 22px; } .ccdt-edit__preview h2 { font-size: 18px; } .ccdt-edit__preview h3 { font-size: 14px; }
-.ccdt-edit__preview p { margin: 6px 0; }
-.ccdt-edit__preview ul { margin: 6px 0 6px 20px; }
-.ccdt-edit__preview blockquote { border-left: 3px solid var(--fg); padding-left: 10px; color: var(--fg-dim); margin: 6px 0; }
-.ccdt-edit__drop { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(5,8,10,0.85); color: var(--fg-bright); font-size: 14px; letter-spacing: 2px; border: 2px dashed var(--fg); pointer-events: none; }
-.ccdt-edit__photos { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); max-height: 110px; overflow-y: auto; }
+.ccdt-edit__ribbon-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.ccdt-edit__ribbon-row--file { padding-bottom: 4px; border-bottom: 1px solid #e1e1e1; }
+.ccdt-edit__ribbon-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #1a1a1a;
+  flex: 1;
+}
+.ccdt-edit__ribbon-row--fmt { flex-wrap: wrap; }
+.ccdt-edit__select {
+  background: #ffffff;
+  color: #1a1a1a;
+  border: 1px solid #c0c0c0;
+  border-radius: 2px;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 150ms var(--ease-out);
+}
+.ccdt-edit__select:hover { border-color: #888; }
+.ccdt-edit__select:focus { border-color: #2a73d8; }
+.ccdt-edit__select--sm { width: 44px; }
+.ccdt-edit__divider {
+  width: 1px;
+  height: 22px;
+  background: #d0d0d0;
+  margin: 0 4px;
+}
+.ccdt-edit__btn {
+  background: #ffffff;
+  color: #1a1a1a;
+  border: 1px solid #c0c0c0;
+  border-radius: 2px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), transform 100ms var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ccdt-edit__btn:hover { background: #e8e8e8; border-color: #888; }
+}
+.ccdt-edit__btn:active { transform: scale(0.96); }
+.ccdt-edit__btn--icon {
+  min-width: 30px;
+  padding: 3px 6px;
+  font-size: 13px;
+}
+.ccdt-edit__btn--primary {
+  background: #2a73d8;
+  color: #ffffff;
+  border-color: #1f5fbd;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .ccdt-edit__btn--primary:hover { background: #1f5fbd; border-color: #144791; }
+}
+.ccdt-edit__btn--ghost {
+  background: transparent;
+  color: #1a1a1a;
+}
+
+/* Color picker tiles */
+.ccdt-edit__color {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid #c0c0c0;
+  border-radius: 2px;
+  padding: 3px 6px;
+  cursor: pointer;
+  background: #ffffff;
+  transition: background-color 150ms var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ccdt-edit__color:hover { background: #e8e8e8; }
+}
+.ccdt-edit__color-label {
+  font-weight: 700;
+  font-size: 12px;
+  color: #1a1a1a;
+  pointer-events: none;
+  padding: 0 2px;
+  border-bottom: 2px solid currentColor;
+  color: #000;
+}
+.ccdt-edit__color input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Page (the editable area on a white card) */
+.ccdt-edit__page {
+  flex: 1; min-height: 0;
+  display: flex; justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+  background: #ececec;
+}
+.ccdt-edit__paper {
+  background: #ffffff;
+  color: #1a1a1a;
+  width: 100%;
+  max-width: 880px;
+  min-height: 600px;
+  padding: 56px 72px;
+  font-family: "Calibri", "Segoe UI", "Liberation Sans", sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  outline: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.08);
+  caret-color: #1a1a1a;
+  transition: box-shadow 200ms var(--ease-out);
+}
+.ccdt-edit__paper:focus { box-shadow: 0 1px 6px rgba(0,0,0,0.18), 0 6px 24px rgba(0,0,0,0.10); }
+.ccdt-edit__paper:empty::before {
+  content: attr(data-placeholder);
+  color: #a0a0a0;
+  white-space: pre-wrap;
+  pointer-events: none;
+  display: block;
+}
+.ccdt-edit__paper h1 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 16px 0 8px;
+  color: #000;
+}
+.ccdt-edit__paper h2 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 14px 0 6px;
+  color: #000;
+}
+.ccdt-edit__paper h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 12px 0 4px;
+  color: #000;
+}
+.ccdt-edit__paper p { margin: 6px 0; }
+.ccdt-edit__paper ul, .ccdt-edit__paper ol { margin: 6px 0 6px 22px; }
+.ccdt-edit__paper blockquote {
+  margin: 10px 0;
+  padding: 8px 14px;
+  border-left: 4px solid #2a73d8;
+  color: #1a1a1a;
+  background: #f4f4f4;
+  font-style: italic;
+}
+.ccdt-edit__paper a { color: #0a4d8c; text-decoration: underline; }
+.ccdt-edit__paper code {
+  background: #f4f4f4;
+  padding: 1px 4px;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 12.5px;
+}
+.ccdt-edit__paper img {
+  max-width: 100%;
+  border: 1px solid #ddd;
+  margin: 10px 0;
+}
+.ccdt-edit__paper hr {
+  border: none;
+  border-top: 1px solid #888;
+  margin: 14px 0;
+}
+
+.ccdt-edit__drop {
+  position: absolute; inset: 0;
+  display: none;
+  align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.85);
+  color: #1a1a1a;
+  font-size: 14px;
+  letter-spacing: 2px;
+  border: 2px dashed #2a73d8;
+  pointer-events: none;
+}
+
+/* Bottom strip */
+.ccdt-edit__bottom {
+  flex: 0 0 auto;
+  background: #f9f9f9;
+  border-top: 1px solid #c8c8c8;
+  padding: 6px 12px;
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.ccdt-edit__status {
+  font-size: 11px;
+  color: #666;
+  text-align: right;
+  min-height: 14px;
+}
+.ccdt-edit__photos {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding-top: 6px;
+}
 .ccdt-edit__photos:empty { display: none; }
-.ccdt-edit__photos-label { width: 100%; color: var(--fg-dim); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
-.ccdt-edit__photo { position: relative; width: 80px; height: 80px; border: 1px solid var(--line); background: #0a0f12; display: flex; align-items: center; justify-content: center; }
+.ccdt-edit__photos-label {
+  width: 100%; color: #666; font-size: 10px;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.ccdt-edit__photo {
+  position: relative; width: 64px; height: 64px;
+  border: 1px solid #c0c0c0; background: #ffffff;
+  display: flex; align-items: center; justify-content: center;
+}
 .ccdt-edit__photo img { max-width: 100%; max-height: 100%; object-fit: cover; }
-.ccdt-edit__photo-name { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); color: var(--fg-dim); font-size: 9px; padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ccdt-edit__photo-rm { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7); color: #ff5b5b; border: none; width: 16px; height: 16px; cursor: pointer; line-height: 14px; font-size: 12px; padding: 0; }
-.ccdt-edit__status { color: var(--fg-dim); font-size: 11px; padding-top: 4px; text-align: right; min-height: 16px; }
+.ccdt-edit__photo-name {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: rgba(255,255,255,0.85);
+  color: #1a1a1a; font-size: 9px;
+  padding: 2px 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ccdt-edit__photo-rm {
+  position: absolute; top: 2px; right: 2px;
+  background: rgba(0,0,0,0.6); color: #fff;
+  border: none; width: 16px; height: 16px;
+  cursor: pointer; line-height: 14px;
+  font-size: 12px; padding: 0;
+}
+
+/* ───────── Save dialog (Word 2026-style modal) ───────── */
+.ccdt-save {
+  position: absolute; inset: 0;
+  z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+  animation: dialogEnter 200ms var(--ease-out) both;
+}
+.ccdt-save[hidden] { display: none; }
+.ccdt-save__backdrop {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.45);
+  cursor: default;
+}
+.ccdt-save__panel {
+  position: relative;
+  background: #ffffff;
+  color: #1a1a1a;
+  width: 460px;
+  max-width: calc(100% - 32px);
+  padding: 20px 24px 16px;
+  border: 1px solid #c0c0c0;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.30);
+  font-family: "Calibri", "Segoe UI", sans-serif;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.ccdt-save__title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #2a73d8;
+  margin-bottom: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e1e1e1;
+}
+.ccdt-save__lbl {
+  display: flex; flex-direction: column; gap: 3px;
+  font-size: 11px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.ccdt-save__inp {
+  background: #ffffff;
+  color: #1a1a1a;
+  border: 1px solid #c0c0c0;
+  border-radius: 2px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+  outline: none;
+  transition: border-color 150ms var(--ease-out);
+}
+.ccdt-save__inp:focus { border-color: #2a73d8; }
+.ccdt-save__files {
+  font-size: 11px;
+  color: #666;
+  margin-top: 4px;
+}
+.ccdt-save__actions {
+  display: flex; justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #e1e1e1;
+}
+.ccdt-save__btn {
+  background: #ffffff;
+  color: #1a1a1a;
+  border: 1px solid #c0c0c0;
+  border-radius: 2px;
+  padding: 6px 18px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), transform 100ms var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ccdt-save__btn:hover { background: #e8e8e8; border-color: #888; }
+}
+.ccdt-save__btn:active { transform: scale(0.97); }
+.ccdt-save__btn--ok {
+  background: #2a73d8;
+  color: #ffffff;
+  border-color: #1f5fbd;
+}
+@media (hover: hover) and (pointer: fine) {
+  .ccdt-save__btn--ok:hover { background: #1f5fbd; border-color: #144791; }
+}
+.ccdt-save__btn--cancel { background: #ffffff; }
+@keyframes dialogEnter {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    ANIMATIONS — Emil Kowalski design engineering philosophy
@@ -518,7 +948,9 @@ html, body, #root {
 }
 
 /* ── WinBox window content — fade-in on open ── */
-.wb-body > * {
+/* (Disabled inside the editor + dossier since they have their own
+   ribbon/page layout that we don't want scaled.) */
+.wb-body > *:not(.ccdt-edit--word):not(.ccdt-dossier):not(.ccdt-save) {
   animation: winboxContentEnter 200ms var(--ease-out) both;
 }
 @keyframes winboxContentEnter {
