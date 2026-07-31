@@ -1044,3 +1044,250 @@ html, body, #root {
     to   { opacity: 1; }
   }
 }
+
+/* ───────── O5 COUNCIL EMERGENT MESSAGE OVERLAY ───────── */
+/*
+   Fullscreen freeze popup — sits above every WinBox, intercepts every
+   pointer event. Red-bordered SCiPNet-style warning card with warning
+   icon, title, subtitle, sender, subject, classification, and a
+   countdown hint ("click anywhere or wait 10s to open").
+*/
+.ccdt-o5-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483600;          /* sit above WinBox + everything else */
+  background: rgba(0, 0, 0, 0.86);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  animation: ccdt-o5-overlay-in 180ms ease both;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+@keyframes ccdt-o5-overlay-in {
+  from { opacity: 0; backdrop-filter: blur(0); }
+  to   { opacity: 1; backdrop-filter: blur(2px); }
+}
+.ccdt-o5-card {
+  width: min(560px, 92vw);
+  border: 2px solid #ff4d6d;
+  background: #0a0f12;
+  color: #ff4d6d;
+  padding: 36px 32px 32px;
+  font-family: "SFMono-Regular", "Consolas", "Liberation Mono", "Menlo", monospace;
+  text-align: center;
+  box-shadow:
+    0 0 0 1px rgba(255, 77, 109, 0.25) inset,
+    0 0 40px rgba(255, 77, 109, 0.35),
+    0 0 80px rgba(255, 77, 109, 0.18);
+  position: relative;
+  animation: ccdt-o5-card-in 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@keyframes ccdt-o5-card-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.ccdt-o5-icon {
+  width: 56px;
+  height: 56px;
+  color: #ff4d6d;
+  margin: 0 auto 18px;
+  display: block;
+  filter: drop-shadow(0 0 12px rgba(255, 77, 109, 0.6));
+  animation: ccdt-o5-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ccdt-o5-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.ccdt-o5-title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 2.5px;
+  line-height: 1.5;
+  color: #ff4d6d;
+  text-transform: uppercase;
+  margin: 0 0 8px;
+}
+.ccdt-o5-sub {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: #ff4d6d;
+  opacity: 0.85;
+  text-transform: uppercase;
+  margin: 0 0 24px;
+}
+.ccdt-o5-from {
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #b6ffd9;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+.ccdt-o5-from strong { color: #38ff9a; font-weight: 700; }
+.ccdt-o5-subj {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(255, 77, 109, 0.12);
+  border: 1px solid rgba(255, 77, 109, 0.35);
+  padding: 10px 14px;
+  margin: 0 auto 18px;
+  max-width: 460px;
+  word-break: break-word;
+}
+.ccdt-o5-meta {
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  color: rgba(255, 77, 109, 0.7);
+  text-transform: uppercase;
+}
+.ccdt-o5-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 2px,
+      rgba(255, 77, 109, 0.03) 2px,
+      rgba(255, 77, 109, 0.03) 3px
+    );
+}
+
+/* ───────── O5 COMPOSE (mail composer with broadcast enabled) ───────── */
+.ccdt-compose--o5 .ccdt-compose__title {
+  color: #ff4d6d;
+  letter-spacing: 2px;
+}
+.ccdt-compose__o5-hint {
+  background: rgba(255, 77, 109, 0.08);
+  border: 1px solid rgba(255, 77, 109, 0.35);
+  border-left: 3px solid #ff4d6d;
+  padding: 10px 12px;
+  margin: 6px 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: #ffd166;
+  line-height: 1.55;
+}
+.ccdt-compose__o5-hint strong { color: #ff4d6d; }
+.ccdt-compose__o5-hint code {
+  background: rgba(255, 77, 109, 0.15);
+  color: #ff4d6d;
+  padding: 1px 4px;
+  font-size: 10.5px;
+}
+
+/* ───────── O5 ACTIVITY LOG BROWSER ───────── */
+.ccdt-log {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #0a0f12;
+  color: var(--fg);
+  font-family: "SFMono-Regular", "Consolas", "Liberation Mono", "Menlo", monospace;
+}
+.ccdt-log__bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border-bottom: 2px solid #ff4d6d;
+  background: rgba(255, 77, 109, 0.05);
+}
+.ccdt-log__title {
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #ff4d6d;
+  font-size: 13px;
+}
+.ccdt-log__status {
+  flex: 1;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--fg-dim);
+}
+.ccdt-log__refresh {
+  background: transparent;
+  border: 1px solid #ff4d6d;
+  color: #ff4d6d;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background 150ms var(--ease-out), color 150ms var(--ease-out);
+}
+.ccdt-log__refresh:hover { background: #ff4d6d; color: #05080a; }
+.ccdt-log__refresh:active { transform: scale(0.97); }
+.ccdt-log__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 18px;
+}
+.ccdt-log__body--fresh { animation: ccdt-log-flash 600ms ease both; }
+@keyframes ccdt-log-flash {
+  0%   { background: rgba(56, 255, 154, 0.05); }
+  100% { background: transparent; }
+}
+.ccdt-log__loading, .ccdt-log__empty {
+  color: var(--fg-dim);
+  text-align: center;
+  padding: 40px 20px;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.ccdt-log__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.ccdt-log__table th {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--fg-dim);
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.ccdt-log__table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(17, 51, 31, 0.5);
+  vertical-align: top;
+}
+.ccdt-log__row:hover td { background: rgba(56, 255, 154, 0.04); }
+.ccdt-log__time { color: var(--fg-dim); white-space: nowrap; font-size: 11px; }
+.ccdt-log__actor { color: var(--fg-bright); }
+.ccdt-log__actor .ccdt-log__lvl {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 5px;
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  color: var(--fg-dim);
+  border: 1px solid var(--line);
+}
+.ccdt-log__action {
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+.ccdt-log__target {
+  color: var(--fg);
+  word-break: break-word;
+}
+.ccdt-log__foot {
+  margin-top: 14px;
+  color: var(--fg-dim);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}

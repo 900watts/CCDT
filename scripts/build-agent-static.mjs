@@ -133,8 +133,9 @@ const AGENT_BANNER_MD = `<!--
 const AGENT_BANNER_JSON = {
   _read_this_first: 'You are talking to a database, not a blog.',
   _what: 'This file is a public, no-auth dump of a Supabase-backed archive.',
-  _public_only: 'Only PUBLIC-classified records. CONFIDENTIAL/SECRET/TOP SECRET records require a Supabase JWT and are not exported here.',
-  _auth: 'For full read or any write, get a Bearer token via {SUPABASE_URL}/auth/v1/token?grant_type=password and call Supabase REST directly with Authorization: Bearer <token>. RLS enforces the operator\'s clearance_level (1..4) on every call.',
+  _public_only: 'Only PUBLIC-classified records. CONFIDENTIAL/SECRET/TOP SECRET/O5 records require a Supabase JWT and are not exported here.',
+  _auth: 'For full read or any write, get a Bearer token via {SUPABASE_URL}/auth/v1/token?grant_type=password and call Supabase REST directly with Authorization: Bearer <token>. RLS enforces the operator\'s clearance_level (1..5) on every call — 5 is the O5 Council tier.',
+  _o5: 'O5 (Council, clearance_level=5) is reserved for the founder account (suuupercharge900watts@hotmail.com). O5 commands: allfiles, promote <email> <lvl>, demote <email> <lvl>, logs, mail send all <classification>.',
   _citation: 'CCDT (https://company-archive-terminal.vercel.app)',
   _generated_at: 'will be filled per-file'
 }
@@ -161,8 +162,8 @@ lists) is the AI-agent interface.
 - Structured JSON for every archive and for the site itself.
 
 ## What you can NOT read here
-- CONFIDENTIAL, SECRET, and TOP SECRET records (gated by clearance, require a
-  Supabase JWT — see the SPA at ${SITE_URL}).
+- CONFIDENTIAL, SECRET, TOP SECRET, and O5 records (gated by clearance_level
+  1..5, require a Supabase JWT — see the SPA at ${SITE_URL}).
 - Mailbox content (per-user, requires a JWT).
 - The live editor / write tools (requires a JWT).
 

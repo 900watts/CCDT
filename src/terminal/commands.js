@@ -12,35 +12,24 @@ import {
   demoAddMessage, demoMarkRead
 } from '../store'
 import { getOnlinePeers } from '../presence'
+import { getClearance, isO5, O5_LEVEL, clearanceLabel, O5_FOUNDER_EMAIL } from '../o5'
+
+export { getClearance, isO5, O5_LEVEL, clearanceLabel }
 
 const DEMO_USER = { id: 'demo-agent', email: 'agent@archive.local' }
 
 const CLASSIFICATIONS = ['PUBLIC', 'CONFIDENTIAL', 'SECRET', 'TOP SECRET']
 
 // Clearance model: each classification maps to the minimum clearance level an
-// operator must hold to READ it. 1 = PUBLIC … 4 = TOP SECRET.
+// operator must hold to READ it. 1 = PUBLIC … 4 = TOP SECRET … 5 = O5 COUNCIL.
 // This is the real enforcement that was missing before — a level-2 operator can
 // no longer open a level-4 (TOP SECRET) document.
 const CLEARANCE_LEVEL = { PUBLIC: 1, CONFIDENTIAL: 2, SECRET: 3, 'TOP SECRET': 4 }
-const MAX_CLEARANCE = 4
+const MAX_CLEARANCE = O5_LEVEL  // 5 — includes O5
 
 function requiredLevel(rec) {
-  return CLEARANCE_LEVEL[String((rec && rec.classification) || '').toUpperCase()] || 1
-}
-
-// The operator's current clearance level (defaults to 1 / PUBLIC when unset).
-export function getClearance(ctx) {
-  if (!ctx || !ctx.user) return 1
-  const u = ctx.user
-  // Supabase stores signUp({ options: { data } }) into user_metadata, but
-  // auth.admin.createUser and some flows write to app_metadata. Probe both
-  // plus the rare top-level placement, in priority order.
-  const raw =
-    u.clearance_level ??
-    u.user_metadata?.clearance_level ??
-    u.app_metadata?.clearance_level
-  const lvl = Number(raw)
-  return Number.isFinite(lvl) && lvl > 0 ? Math.min(lvl, MAX_CLEARANCE) : 1
+  const cls = String((rec && rec.classification) || '').toUpperCase()
+  return CLEARANCE_LEVEL[cls] || 1
 }
 
 // Username validation: 3-32 chars, [a-z0-9_-], case-insensitive stored.
@@ -80,7 +69,7 @@ export async function claimUsername(username, ctx) {
   return { ok: true, username: u.toLowerCase() }
 }
 
-const HELP = [
+const HELP_BASE = [
   { cls: 'ok', text: '═══════════════ CCDT COMMAND REFERENCE ═══════════════' },
   { cls: 'dim', text: '' },
 
@@ -106,7 +95,7 @@ const HELP = [
   { cls: 'ok', text: '▸ SESSION' },
   { cls: 'sys',  text: '  login [email pw]      authenticate (prompts if no args given)' },
   { cls: 'sys',  text: '  register              create an operator account (guided: email, password, clearance)' },
-  { cls: 'dim',  text: '      or inline: register me@corp.com hunter2 3   (clearance 1-4)' },
+  { cls: 'dim',  text: '      or inline: register me@corp.com hunter2 3   (clearance 1–5)' },
   { cls: 'sys',  text: '  logout                end the current session' },
   { cls: 'sys',  text: '  changepass [old new]  change your password' },
   { cls: 'dim',  text: '      bare `changepass` prompts for current + new password' },
@@ -129,9 +118,27 @@ const HELP = [
   { cls: 'sys',  text: '  clear                 clear the screen' },
   { cls: 'sys',  text: '  help                  show this reference' },
   { cls: 'dim', text: '' },
-  { cls: 'dim', text: '  clearance levels: 1 PUBLIC · 2 CONFIDENTIAL · 3 SECRET · 4 TOP SECRET' },
+  { cls: 'dim', text: '  clearance levels: 1 PUBLIC · 2 CONFIDENTIAL · 3 SECRET · 4 TOP SECRET · 5 O5 COUNCIL' },
   { cls: 'dim', text: '  tip: ↑/↓ scroll command history · blank line finishes multi-line input' }
 ]
+
+// HELP now adapts to the caller's clearance — O5 sees the council section.
+function HELP(ctx) {
+  const out = [...HELP_BASE]
+  if (ctx && isO5(ctx)) {
+    out.push(
+      { cls: 'ok',  text: '' },
+      { cls: 'ok',  text: '▸ O5 COUNCIL (LEVEL 5)' },
+      { cls: 'sys', text: '  allfiles [n]           view every archive ever created, regardless of clearance' },
+      { cls: 'sys', text: '  promote <email> <lvl>  raise a user to clearance level 1–5 (capped at yours)' },
+      { cls: 'sys', text: '  demote  <email> <lvl>  lower a user to clearance level 1–5' },
+      { cls: 'sys', text: '  logs                  open the activity log browser (auto-refresh every 10s)' },
+      { cls: 'sys', text: '  mail send all <cls>   broadcast a priority:o5 mail to every user >= <cls>' },
+      { cls: 'dim', text: '      type `all` in the TO bracket — the composer tags it as priority:o5 automatically.' }
+    )
+  }
+  return out
+}
 
 // Guided "create" wizard field definitions. `multiline` steps accumulate lines
 // until a blank line is submitted. `validate` returns an error string or null.
@@ -873,9 +880,13 @@ export async function doSendMessage({ recipient, subject, body, priority, classi
   if (!subject) return { ok: false, reason: 'subject_required' }
   if (!body) return { ok: false, reason: 'body_required' }
   const cls = String(classification || 'PUBLIC').toUpperCase()
-  if (!CLASSIFICATIONS.includes(cls)) return { ok: false, reason: 'invalid_classification' }
-  const pri = String(priority || 'normal').toLowerCase()
-  if (!['normal', 'important', 'urgent'].includes(pri)) return { ok: false, reason: 'invalid_priority' }
+  if (!CLASSIFICATIONS.includes(cls) && cls !== 'O5') return { ok: false, reason: 'invalid_classification' }
+  // Priority: 'o5' is reserved for O5 council broadcasts; must be issued by O5.
+  const isBroadcast = r === 'all' || r === 'everyone'
+  let pri = String(priority || 'normal').toLowerCase()
+  if (isBroadcast) pri = 'o5'
+  if (!['normal', 'important', 'urgent', 'o5'].includes(pri)) return { ok: false, reason: 'invalid_priority' }
+  if (pri === 'o5' && !isO5(ctx)) return { ok: false, reason: 'O5 priority requires O5 council clearance' }
 
   if (ctx.isConfigured) {
     const { data, error } = await ctx.supabase.rpc('peek_send_message', {
@@ -884,12 +895,32 @@ export async function doSendMessage({ recipient, subject, body, priority, classi
     if (error) return { ok: false, reason: error.message }
     if (data?.status === 'not_found') return { ok: false, reason: `recipient "${r}" does not exist` }
     if (data?.status === 'denied') return { ok: false, reason: data.reason || 'denied' }
-    return { ok: true, id: data.id, recipient: data.recipient }
+    if (data?.broadcast) return { ok: true, broadcast: data.broadcast, recipient: 'all', subject: data.subject, priority: pri }
+    return { ok: true, id: data.id, recipient: data.recipient, priority: pri }
   }
   // DEMO
+  if (isBroadcast) {
+    // Simulate: insert one demo message addressed to every demo username.
+    let count = 0
+    for (const un of demoUsernames.keys()) {
+      demoAddMessage({
+        sender_id: ctx.user.id,
+        sender_email: ctx.user.email,
+        sender_username: '',
+        recipient: un,
+        subject: '[O5 BROADCAST] ' + subject,
+        body,
+        priority: 'o5',
+        classification: cls,
+        created_at: new Date().toISOString()
+      })
+      count++
+    }
+    return { ok: true, broadcast: count, recipient: 'all', subject: '[O5 BROADCAST] ' + subject, priority: 'o5' }
+  }
   const hit = demoLookupByUsername(r)
   if (!hit) return { ok: false, reason: `recipient "${r}" does not exist` }
-  const req = CLEARANCE_LEVEL[cls]
+  const req = CLEARANCE_LEVEL[cls] || 1
   if (req > getClearance(ctx)) return { ok: false, reason: `requires level ${req}` }
   const m = demoAddMessage({
     sender_id: ctx.user.id,
@@ -901,7 +932,7 @@ export async function doSendMessage({ recipient, subject, body, priority, classi
     classification: cls,
     created_at: new Date().toISOString()
   })
-  return { ok: true, id: m.id, recipient: r }
+  return { ok: true, id: m.id, recipient: r, priority: pri }
 }
 
 export async function doMarkRead(id, ctx) {
@@ -911,6 +942,47 @@ export async function doMarkRead(id, ctx) {
     return data?.status === 'ok'
   }
   return demoMarkRead(id)
+}
+
+// Activity log — peek_log_activity() RPC. Returns rows newest-first.
+// In DEMO mode we synthesise a small feed from local state so the UI can
+// be exercised without Supabase.
+export async function fetchActivityLog(ctx, since = null) {
+  if (ctx.isConfigured) {
+    const { data, error } = await ctx.supabase.rpc('peek_log_activity', { p_since: since })
+    if (error) return []
+    return data || []
+  }
+  // DEMO feed
+  const me = ctx.user
+  if (!me) return []
+  const feed = []
+  // Mirror demoMessages as send_message events.
+  for (const m of demoMessages.slice(-20)) {
+    feed.push({
+      id: m.id + '-send',
+      action: m.priority === 'o5' ? 'broadcast' : 'send_message',
+      target: m.id,
+      detail: { recipient: m.recipient, subject: m.subject, priority: m.priority, classification: m.classification },
+      username: m.sender_username || (m.sender_email || '').split('@')[0],
+      user_clearance: 4,
+      created_at: m.created_at
+    })
+  }
+  // Mirror demoArchives as create events.
+  for (const a of demoStore.slice(-15)) {
+    feed.push({
+      id: 'demo-' + a.archive_number + '-create',
+      action: 'create',
+      target: a.archive_number,
+      detail: { title: a.title, classification: a.classification },
+      username: 'demo-agent',
+      user_clearance: 4,
+      created_at: a.created_at || new Date().toISOString()
+    })
+  }
+  feed.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+  return feed
 }
 
 async function mailCmd(args, ctx) {
@@ -963,7 +1035,7 @@ export async function runCommand(raw, ctx) {
 
   switch (name) {
     case 'help':
-      return HELP
+      return HELP(ctx)
     case 'access':
       return access(args, ctx)
     case 'list':
@@ -1050,10 +1122,24 @@ export async function runCommand(raw, ctx) {
       }
       return [
         { cls: 'sys', text: `operator: ${ctx.user.email} (${ctx.user.id})` },
-        { cls: 'dim', text: `clearance level: ${getClearance(ctx)}` },
-        ...(username ? [{ cls: 'dim', text: `username: ${username}` }] : [])
+        { cls: 'dim', text: `clearance level: ${getClearance(ctx)} (${clearanceLabel(getClearance(ctx))})` },
+        ...(username ? [{ cls: 'dim', text: `username: ${username}` }] : []),
+        ...(isO5(ctx) ? [{ cls: 'warn', text: '⚠ O5 COUNCIL — all clearance commands unlocked.' }] : [])
       ]
     }
+    // ──────────────────────────────────────────────────────────
+    // O5 council commands (level 5 only)
+    // ──────────────────────────────────────────────────────────
+    case 'allfiles':
+    case 'viewall':
+    case 'listall':
+      return o5ListAll(args, ctx)
+    case 'promote':
+      return o5Promote(args, ctx)
+    case 'demote':
+      return o5Demote(args, ctx)
+    case 'logs':
+      return o5Logs(args, ctx)
     case 'mail':
       return await mailCmd(args, ctx)
     case 'about':
@@ -1077,5 +1163,121 @@ export async function runCommand(raw, ctx) {
       return [{ clear: true }]
     default:
       return [{ cls: 'err', text: `command not found: ${parts[0]}. type "help".` }]
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// O5 council commands — guarded by isO5(ctx). See src/o5.js for the rule.
+// ──────────────────────────────────────────────────────────────────────────
+
+function o5Guard(ctx) {
+  if (!ctx.user) return [{ cls: 'err', text: 'O5 COMMAND DENIED — authentication required.' }]
+  if (!isO5(ctx)) {
+    return [
+      { cls: 'err', text: 'O5 COMMAND DENIED — council clearance required.' },
+      { cls: 'dim', text: `you hold level ${getClearance(ctx)}; this command requires level 5 (O5 COUNCIL).` }
+    ]
+  }
+  return null
+}
+
+// allfiles / viewall — bypass RLS clearance gate and list EVERY archive.
+// Live mode: this runs as SECURITY DEFINER via peek_all_archives() RPC.
+// DEMO mode: dumps the local demoData set (already complete).
+async function o5ListAll(args, ctx) {
+  const guard = o5Guard(ctx)
+  if (guard) return guard
+  const limit = Math.min(parseInt(args[0], 10) || 50, 500)
+  let rows = []
+  if (ctx.isConfigured) {
+    const { data, error } = await ctx.supabase.rpc('peek_all_archives', { p_limit: limit })
+    if (error) return [{ cls: 'err', text: `QUERY ERROR: ${error.message}` }]
+    rows = data || []
+  } else {
+    // DEMO: show the full local store (no clearance filter).
+    rows = ctx.demoData.slice(0, limit)
+  }
+  if (!rows.length) return [{ cls: 'dim', text: 'NO ARCHIVES ON RECORD.' }]
+  const out = [{ cls: 'ok', text: `ALL ARCHIVES (${rows.length}) — O5 OVERRIDE` }]
+  // Column widths from data.
+  const clsWidth = Math.max(13, ...rows.map((r) => String(r.classification || '').length))
+  for (const r of rows) {
+    const cls = String(r.classification || 'PUBLIC').padEnd(clsWidth, ' ')
+    const dept = r.department ? ` · ${r.department}` : ''
+    out.push({ cls: 'sys', text: `  [${r.archive_number}] ${cls}  ${r.title}${dept}` })
+  }
+  out.push({ cls: 'dim', text: '' })
+  out.push({ cls: 'dim', text: 'O5 override: archives are listed regardless of their required clearance.' })
+  return out
+}
+
+// promote <email> <level 1..5> — only O5.
+async function o5Promote(args, ctx) {
+  const guard = o5Guard(ctx)
+  if (guard) return guard
+  if (args.length < 2) return [{ cls: 'warn', text: 'usage: promote <email> <level 1..5>' }]
+  return o5SetClearance(args[0], parseInt(args[1], 10), ctx)
+}
+
+// demote <email> <level 1..5> — only O5. Same RPC, same gate, just a
+// semantic label for the operator. The SQL function decides whether it
+// counts as promote or demote based on the previous level.
+async function o5Demote(args, ctx) {
+  const guard = o5Guard(ctx)
+  if (guard) return guard
+  if (args.length < 2) return [{ cls: 'warn', text: 'usage: demote <email> <level 1..5>' }]
+  return o5SetClearance(args[0], parseInt(args[1], 10), ctx)
+}
+
+async function o5SetClearance(email, newLevel, ctx) {
+  if (!Number.isFinite(newLevel) || newLevel < 1 || newLevel > 5) {
+    return [{ cls: 'err', text: 'INVALID LEVEL — must be an integer from 1 to 5.' }]
+  }
+  const meLevel = getClearance(ctx)
+  if (newLevel > meLevel) {
+    return [
+      { cls: 'err', text: 'PROMOTE/DEMOTE DENIED — target level exceeds your own clearance.' },
+      { cls: 'dim', text: `requested ${newLevel}; you hold ${meLevel}.` }
+    ]
+  }
+  if (ctx.isConfigured) {
+    const { data, error } = await ctx.supabase.rpc('peek_set_clearance', {
+      p_target_email: String(email),
+      p_new_level: newLevel
+    })
+    if (error) return [{ cls: 'err', text: `RPC ERROR: ${error.message}` }]
+    if (data?.status === 'not_found') return [{ cls: 'err', text: `USER NOT FOUND: ${email}` }]
+    if (data?.status === 'denied') {
+      return [
+        { cls: 'err', text: `SET CLEARANCE DENIED — ${data.reason || 'denied'}` },
+        ...(data.your_level != null ? [{ cls: 'dim', text: `your level: ${data.your_level}` }] : [])
+      ]
+    }
+    const from = data.from ?? '?'
+    const to = data.to ?? newLevel
+    const verb = to > from ? 'PROMOTED' : to < from ? 'DEMOTED' : 'UNCHANGED'
+    return [
+      { cls: 'ok', text: `${verb} ${data.target} (${data.username || 'no-username'}) L${from} → L${to}.` },
+      { cls: 'dim', text: 'change propagates on the target user\'s next request.' }
+    ]
+  }
+  // DEMO mode: simulate success — no real DB to update.
+  return [
+    { cls: 'ok', text: `(DEMO) clearance change simulated for ${email} → L${newLevel}.` },
+    { cls: 'dim', text: 'connect Supabase to actually persist clearance levels.' }
+  ]
+}
+
+// logs — open the activity log browser. The browser window is a separate
+// file (src/o5Browser.js). We just return an opener marker.
+function o5Logs(args, ctx) {
+  const guard = o5Guard(ctx)
+  if (guard) return guard
+  return {
+    lines: [
+      { cls: 'ok', text: 'OPENING ACTIVITY LOG BROWSER…' },
+      { cls: 'dim', text: 'new entries appear every 10 seconds. O5 override.' }
+    ],
+    openActivityLog: true
   }
 }

@@ -7,6 +7,8 @@ import { openEditorWindow } from './editorWindow'
 import { md2html } from './markdown'
 import { openInboxWindow, openComposeWindow, openMessageWindow } from './mailboxWindow'
 import { bindPresence, unbindPresence } from './presence'
+import { triggerO5Broadcast } from './o5Popup'
+import { openActivityLogWindow } from './o5Browser'
 import DatabaseView from './DatabaseView'
 
 const CLASS_COLOR = {
@@ -148,6 +150,9 @@ export default function App() {
   // Scans the operator's inbox every 10s. When a NEW message arrives:
   //   - if the mailbox window is open  → dispatch ccdt:mail:refresh (soft reload)
   //   - if the mailbox window is closed → print a one-line notice to the terminal
+  //   - if the new message is priority:o5 → freeze the screen with the
+  //     warning popup (triggerO5Broadcast). The popup auto-dismisses after
+  //     10s OR on click, then opens the mailbox + jumps to the message.
   // Tracks seen IDs in a ref so we only surface messages we haven't shown yet.
   const seenMailIds = useRef(new Set())
   useEffect(() => {
@@ -167,6 +172,26 @@ export default function App() {
         const fresh = rows.filter((r) => !seenMailIds.current.has(r.id))
         if (!fresh.length) return
         fresh.forEach((r) => seenMailIds.current.add(r.id))
+
+        // O5 council broadcast takes priority — freeze the screen first.
+        const o5Fresh = fresh.filter((r) => String(r.priority || '').toLowerCase() === 'o5')
+        if (o5Fresh.length) {
+          // Pick the newest O5 message as the headline.
+          o5Fresh.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+          triggerO5Broadcast(o5Fresh[0], ctx())
+          // Soft-refresh any open mailbox so the O5 row appears there too.
+          document.querySelectorAll('.winbox.ccdt-win--mail .ccdt-mail').forEach((el) => {
+            el.dispatchEvent(new CustomEvent('ccdt:mail:refresh', { bubbles: true }))
+          })
+          // Don't print the normal "NEW MAIL" notice — the popup already
+          // does the talking. We still print a quiet log entry so the
+          // terminal records it.
+          append([{
+            cls: 'warn',
+            text: `▶▶ O5 EMERGENT MESSAGE — "${o5Fresh[0].subject || '(no subject)'}" (freezing screen…)`
+          }])
+          return
+        }
 
         // Is a mailbox window currently open?
         const mailboxOpen = !!document.querySelector('.winbox.ccdt-win--mail')
@@ -225,13 +250,15 @@ export default function App() {
     if (mode === 'login-pass') return 'PASSWORD:'
     if (mode === 'register-email') return 'EMAIL:'
     if (mode === 'register-pass') return 'PASSWORD:'
-    if (mode === 'register-level') return 'CLEARANCE [1-4]:'
+    if (mode === 'register-level') return 'CLEARANCE [1-5]:'
     if (mode === 'register-username') return 'USERNAME:'
     if (mode === 'change-pw-old') return 'OLD PASSWORD:'
     if (mode === 'change-pw-new') return 'NEW PASSWORD:'
     if (mode === 'confirm-delete') return 'CONFIRM>'
     const name = user ? (user.email || 'admin').split('@')[0] : 'guest'
-    return `${name}@CCDT:~$`
+    const lvl = getClearance(ctx())
+    const o5Tag = lvl >= 5 ? '★O5★' : ''
+    return `${o5Tag}${name}@CCDT:~$`
   }
 
   const wizardPrompt = () => {
@@ -536,6 +563,8 @@ export default function App() {
           openInboxWindow(liveCtx, (m) => openMessageWindow(m, liveCtx))
         }
       }
+      // O5 activity log browser
+      if (res.openActivityLog) openActivityLogWindow(liveCtx)
     }
   }
 
@@ -623,13 +652,15 @@ export default function App() {
             onKeyDown={onKeyDown}
           placeholder={
             mode === 'normal'
-              ? "access 173  ·  database  ·  create  ·  help"
+              ? (getClearance(ctx()) >= 5
+                  ? "access 173  ·  allfiles  ·  promote/demote  ·  logs  ·  mail"
+                  : "access 173  ·  database  ·  create  ·  help")
               : mode === 'login-email' || mode === 'register-email'
               ? 'email (or username if you have one)'
               : mode === 'login-pass' || mode === 'register-pass'
               ? '••••••••'
               : mode === 'register-level'
-              ? '1 (PUBLIC) · 2 (CONFIDENTIAL) · 3 (SECRET) · 4 (TOP SECRET)'
+              ? '1 (PUBLIC) · 2 (CONFIDENTIAL) · 3 (SECRET) · 4 (TOP SECRET) · 5 (O5 COUNCIL)'
               : mode === 'register-username'
               ? '3-32 chars [a-z0-9_-] — or "skip" to leave empty'
               : mode === 'confirm-delete'

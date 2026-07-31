@@ -7,6 +7,7 @@ import 'winbox/dist/css/winbox.min.css'
 import {
   fetchInbox, fetchSent, doSendMessage, doMarkRead, getClearance
 } from './terminal/commands'
+import { isO5 } from './o5'
 import { nextZIndex, registerWindow, focusIfExists } from './windowStack'
 
 const CLASS_COLOR = {
@@ -159,11 +160,13 @@ export function openInboxWindow(ctx, openMessageWindow) {
 
 export function openComposeWindow(ctx, prefill, onSent) {
   prefill = prefill || {}
+  const o5 = isO5(ctx)
+  const toPlaceholder = o5 ? 'recipient username — or type all / ALL for broadcast' : 'recipient username'
   const html = `
-    <div class="ccdt-compose">
-      <div class="ccdt-compose__title">COMPOSE MESSAGE</div>
-      <label class="ccdt-compose__lbl">TO <span class="ccdt-compose__hint">(username)</span>
-        <input class="ccdt-compose__inp" id="ccdt-c-to" placeholder="recipient username" value="${esc(prefill.recipient || '')}" />
+    <div class="ccdt-compose${o5 ? ' ccdt-compose--o5' : ''}">
+      <div class="ccdt-compose__title">${o5 ? 'O5 COMPOSE — PLATFORM BROADCAST ENABLED' : 'COMPOSE MESSAGE'}</div>
+      <label class="ccdt-compose__lbl">TO <span class="ccdt-compose__hint">${o5 ? '(username or "all" to broadcast)' : '(username)'}</span>
+        <input class="ccdt-compose__inp" id="ccdt-c-to" placeholder="${esc(toPlaceholder)}" value="${esc(prefill.recipient || '')}" />
       </label>
       <label class="ccdt-compose__lbl">SUBJECT
         <input class="ccdt-compose__inp" id="ccdt-c-sub" maxlength="200" placeholder="message subject" value="${esc(prefill.subject || '')}" />
@@ -174,6 +177,7 @@ export function openComposeWindow(ctx, prefill, onSent) {
             <option value="normal" ${prefill.priority === 'urgent' ? '' : 'selected'}>normal</option>
             <option value="important">important</option>
             <option value="urgent" ${prefill.priority === 'urgent' ? 'selected' : ''}>urgent</option>
+            ${o5 ? `<option value="o5" ${prefill.priority === 'o5' ? 'selected' : ''}>o5 (council broadcast)</option>` : ''}
           </select>
         </label>
         <label class="ccdt-compose__lbl ccdt-compose__lbl--half">CLASSIFICATION
@@ -182,25 +186,27 @@ export function openComposeWindow(ctx, prefill, onSent) {
             <option value="CONFIDENTIAL">CONFIDENTIAL</option>
             <option value="SECRET">SECRET</option>
             <option value="TOP SECRET">TOP SECRET</option>
+            ${o5 ? `<option value="O5">O5 (council-only)</option>` : ''}
           </select>
         </label>
       </div>
+      ${o5 ? `<div class="ccdt-compose__o5-hint">O5 — typing <strong>all</strong> in TO broadcasts this message to every user whose clearance &ge; the chosen classification. Subject is auto-tagged <code>[O5 BROADCAST]</code>; priority is forced to <code>o5</code>.</div>` : ''}
       <label class="ccdt-compose__lbl">MESSAGE
         <textarea class="ccdt-compose__inp ccdt-compose__ta" id="ccdt-c-body" maxlength="4000" placeholder="Type your message here…"></textarea>
       </label>
       <div class="ccdt-compose__actions">
-        <button class="ccdt-compose__btn" id="ccdt-c-send">SEND</button>
+        <button class="ccdt-compose__btn" id="ccdt-c-send">${o5 ? 'BROADCAST' : 'SEND'}</button>
         <button class="ccdt-compose__btn ccdt-compose__btn--ghost" id="ccdt-c-cancel">CANCEL</button>
         <span class="ccdt-compose__status" id="ccdt-c-status"></span>
       </div>
     </div>`
 
   const wb = new WinBox({
-    title: 'COMPOSE MESSAGE',
+    title: o5 ? 'O5 COMPOSE — PLATFORM BROADCAST' : 'COMPOSE MESSAGE',
     class: 'ccdt-win ccdt-win--mail',
     html,
     background: '#05080a',
-    border: '2px solid #11331f',
+    border: o5 ? '2px solid #ff4d6d' : '2px solid #11331f',
     x: 'center', y: 'center',
     width: '640px',
     height: '80%',
@@ -220,14 +226,24 @@ export function openComposeWindow(ctx, prefill, onSent) {
       $status.style.color = '#ff5b5b'
       return
     }
-    $status.textContent = 'sending…'
+    // O5 broadcast hint: warn if recipient is "all" but priority isn't o5
+    const isBroadcast = /^(all|everyone)$/i.test(recipient)
+    if (isBroadcast && o5 && priority !== 'o5') {
+      $status.textContent = 'broadcast detected — auto-promoting priority to o5.'
+      $status.style.color = '#ffd166'
+    }
+    $status.textContent = isBroadcast ? 'broadcasting…' : 'sending…'
     $status.style.color = '#ffd166'
     const res = await doSendMessage({ recipient, subject, body, priority, classification }, ctx)
     if (res.ok) {
-      $status.textContent = `sent to ${res.recipient}`
+      if (res.broadcast) {
+        $status.textContent = `broadcast sent to ${res.broadcast} user(s).`
+      } else {
+        $status.textContent = `sent to ${res.recipient}`
+      }
       $status.style.color = '#38ff9a'
       if (onSent) onSent(res)
-      setTimeout(() => wb.close(), 700)
+      setTimeout(() => wb.close(), 900)
     } else {
       $status.textContent = `failed: ${res.reason}`
       $status.style.color = '#ff5b5b'
