@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { supabase, isConfigured } from './supabaseClient'
 import { runCommand, doLogin, doRegister, doDeleteConfirm, fetchMessage, fetchInbox, doMarkRead, CREATE_FIELDS, finalizeCreate, importFile, getClearance, doChangePassword } from './terminal/commands'
+import { isFounderPendingO5 } from './o5'
 import { demoStore } from './store'
 import { openDossierWindow } from './dossierWindow'
 import { openEditorWindow } from './editorWindow'
@@ -244,6 +245,23 @@ export default function App() {
   useEffect(() => {
     if (screenRef.current) screenRef.current.scrollTop = screenRef.current.scrollHeight
   }, [lines])
+
+  // O5 migration-pending hint. When the founder email is signed in but their
+  // clearance_level is still below 5, surface a one-time notice explaining
+  // how to finish the O5 setup. This resolves itself once migration_004 has
+  // been run in the Supabase SQL Editor.
+  useEffect(() => {
+    if (!user) return
+    if (!isFounderPendingO5(ctx())) return
+    append([
+      { cls: 'warn', text: '⚠ O5 COUNCIL MIGRATION PENDING' },
+      { cls: 'dim', text: 'your account is the O5 founder, but the live database has not been promoted yet.' },
+      { cls: 'dim', text: 'open the Supabase SQL Editor for this project and run:' },
+      { cls: 'sys',  text: '  supabase/migration_004_o5_clearance.sql' },
+      { cls: 'dim', text: 'the script is idempotent — it will auto-promote you to clearance_level=5 and seed the activity log.' }
+    ])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   const promptText = () => {
     if (mode === 'login-email') return 'EMAIL:'

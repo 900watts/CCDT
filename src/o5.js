@@ -45,6 +45,17 @@ export function isO5(ctx) {
   return getClearance(ctx) >= O5_LEVEL
 }
 
+// Detects the migration-pending state: founder email is signed in but their
+// clearance_level hasn't been promoted to 5 yet (i.e. migration_004 hasn't
+// been applied to the live Supabase project). Used to surface a one-line
+// hint at login time so the operator knows what to do.
+export function isFounderPendingO5(ctx) {
+  if (!ctx || !ctx.user) return false
+  if (isO5(ctx)) return false
+  const email = String(ctx.user.email || '').toLowerCase()
+  return email === O5_FOUNDER_EMAIL.toLowerCase()
+}
+
 // Stable display label. "O5 COUNCIL" for level 5, otherwise the L1..L4 form.
 export function clearanceLabel(lvl) {
   if (lvl >= O5_LEVEL) return 'O5 COUNCIL'
