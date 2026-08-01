@@ -550,6 +550,76 @@ html, body, #root {
 }
 .ccdt-msgview__actions { display: flex; gap: 10px; margin-top: 14px; }
 
+/* ─── Vault-flow action bar (invite / transfer / join-request buttons) ─── */
+.ccdt-msgview__vault-actions {
+  margin-top: 14px;
+  padding: 14px;
+  background: rgba(255, 209, 102, 0.06);
+  border: 1px solid rgba(255, 209, 102, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  animation: ccdt-vault-msg-flash 1.4s ease-out 1 both;
+}
+@keyframes ccdt-vault-msg-flash {
+  0%   { box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.6) inset, 0 0 16px rgba(255, 209, 102, 0.5); }
+  25%  { box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.6) inset, 0 0 16px rgba(255, 209, 102, 0.5); }
+  50%  { box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.2) inset, 0 0 6px  rgba(255, 209, 102, 0.15); }
+  100% { box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.2) inset, 0 0 0  transparent; }
+}
+.ccdt-msgview__vault-banner {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #ffd166;
+  font-weight: 700;
+}
+.ccdt-msgview__vault-banner--warn {
+  color: #ff4d6d;
+  animation: ccdt-vault-msg-text 1.2s ease-out 1 both;
+}
+.ccdt-msgview__vault-banner--ok {
+  color: #38ff9a;
+  font-size: 13px;
+}
+.ccdt-msgview__vault-banner--err {
+  color: #ff5b5b;
+  font-size: 13px;
+}
+.ccdt-msgview__vault-banner--info {
+  color: #b6ffd9;
+  font-size: 12px;
+}
+@keyframes ccdt-vault-msg-text {
+  0%, 100% { color: #ff4d6d; }
+  50% { color: #ffd166; }
+}
+.ccdt-compose__btn--accept {
+  background: linear-gradient(180deg, #38ff9a 0%, #2bd07f 100%);
+  color: #050b08;
+  border: 1px solid #38ff9a;
+  font-weight: 800;
+  letter-spacing: 2px;
+  box-shadow: 0 0 14px rgba(56, 255, 154, 0.4);
+}
+.ccdt-compose__btn--accept:hover:not(:disabled) {
+  background: linear-gradient(180deg, #45ffae 0%, #38ff9a 100%);
+  box-shadow: 0 0 22px rgba(56, 255, 154, 0.7);
+}
+.ccdt-compose__btn--accept:disabled { opacity: 0.4; cursor: not-allowed; }
+.ccdt-compose__btn--danger {
+  background: transparent;
+  color: #ff5b5b;
+  border: 1px solid #ff5b5b;
+}
+.ccdt-compose__btn--danger:hover:not(:disabled) {
+  background: rgba(255, 91, 91, 0.12);
+  color: #ff7e7e;
+  border-color: #ff7e7e;
+}
+.ccdt-compose__btn--danger:disabled { opacity: 0.4; cursor: not-allowed; }
+
 /* ───────── Document Editor — Word 2026 light theme ───────── */
 /* Outside the page is light grey (the chrome backdrop), the page itself
    is white with serif/sans body text, and the ribbon sits in a slightly

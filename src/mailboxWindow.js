@@ -5,7 +5,8 @@ import WinBox from 'winbox/src/js/winbox.js'
 import 'winbox/dist/css/winbox.min.css'
 
 import {
-  fetchInbox, fetchSent, doSendMessage, doMarkRead, getClearance
+  fetchInbox, fetchSent, doSendMessage, doMarkRead, getClearance,
+  doResolveJoinRequest, setActiveVault
 } from './terminal/commands'
 import { isO5 } from './o5'
 import { nextZIndex, registerWindow, focusIfExists } from './windowStack'
@@ -254,12 +255,39 @@ export function openComposeWindow(ctx, prefill, onSent) {
   return wb
 }
 
+// Detect vault-flow mail types by subject prefix.
+// Returns { kind, token } or null if this is a regular message.
+function detectVaultMail(msg) {
+  const subj = String(msg.subject || '')
+  const body = String(msg.body || '')
+  // Pull a 36-char UUID-shaped token out of the body for any of the kinds below.
+  const tok = (body.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i) || [])[0]
+  if (subj.startsWith('[VAULT INVITE]')) {
+    return { kind: 'invite', token: tok }
+  }
+  if (subj.startsWith('[VAULT TRANSFER]')) {
+    return { kind: 'transfer', token: tok }
+  }
+  if (subj.startsWith('[JOIN REQUEST]')) {
+    // body has 'REQUEST ID: <uuid>' — match that specific label too
+    const m = body.match(/REQUEST ID:\s*([0-9a-f-]{36})/i)
+    return { kind: 'join_request', token: m ? m[1] : tok }
+  }
+  if (subj.startsWith('[JOIN REQUEST]') && body.match(/APPROVED|DECLINED/)) {
+    return { kind: 'join_request_result', token: null }
+  }
+  return null
+}
+
 export function openMessageWindow(msg, ctx, onBack) {
   const cls = (msg.classification || 'PUBLIC').toUpperCase()
   const color = CLASS_COLOR[cls] || '#38ff9a'
   const priColor = PRIO_COLOR[(msg.priority || 'normal').toLowerCase()] || '#888'
   const isInbox = !!(msg.recipient && !msg.sender_email)
   const senderLabel = msg.sender_email || msg.sender_username || 'unknown'
+  const vaultMail = detectVaultMail(msg)
+  const actionBar = vaultMail ? renderVaultMailActions(vaultMail, msg, ctx, onBack) : ''
+
   const html = `
     <div class="ccdt-msgview">
       <div class="ccdt-msgview__bar" style="color:${color};border-color:${color}">${esc(cls)} — ${esc((msg.priority || 'normal').toUpperCase())}</div>
@@ -272,6 +300,7 @@ export function openMessageWindow(msg, ctx, onBack) {
       </div>
       <hr class="ccdt-msgview__rule" />
       <pre class="ccdt-msgview__body">${esc(msg.body)}</pre>
+      ${actionBar}
       <div class="ccdt-msgview__actions">
         <button class="ccdt-compose__btn" id="ccdt-msg-reply">REPLY</button>
         <button class="ccdt-compose__btn ccdt-compose__btn--ghost" id="ccdt-msg-close">CLOSE</button>
@@ -283,7 +312,7 @@ export function openMessageWindow(msg, ctx, onBack) {
     class: 'ccdt-win ccdt-win--mail',
     html,
     background: '#05080a',
-    border: '2px solid #11331f',
+    border: vaultMail ? '2px solid #ffd166' : '2px solid #11331f',
     x: 'center', y: 'center',
     width: '640px',
     height: '74%',
@@ -300,5 +329,110 @@ export function openMessageWindow(msg, ctx, onBack) {
     })
   })
 
+  // Wire the vault-flow buttons
+  if (vaultMail) wireVaultMailActions(wb, vaultMail, msg, ctx, onBack)
+
   return wb
+}
+
+// Render the action bar inside the message view based on mail kind.
+// Each button gets a data-action attribute the wire-up step reads.
+function renderVaultMailActions(vaultMail, msg, ctx) {
+  if (vaultMail.kind === 'invite') {
+    if (!vaultMail.token) {
+      return `<div class="ccdt-msgview__vault-actions">
+        <div class="ccdt-msgview__vault-banner">VAULT INVITE — token missing or already used</div>
+      </div>`
+    }
+    return `<div class="ccdt-msgview__vault-actions">
+      <div class="ccdt-msgview__vault-banner">VAULT INVITE — click ACCEPT to join, or DECLINE.</div>
+      <button class="ccdt-compose__btn ccdt-compose__btn--accept" data-action="acceptinvite" data-token="${esc(vaultMail.token)}">ACCEPT — JOIN VAULT</button>
+      <button class="ccdt-compose__btn ccdt-compose__btn--ghost" data-action="close">DISMISS</button>
+    </div>`
+  }
+  if (vaultMail.kind === 'transfer') {
+    if (!vaultMail.token) {
+      return `<div class="ccdt-msgview__vault-actions">
+        <div class="ccdt-msgview__vault-banner">VAULT TRANSFER — token missing or already used</div>
+      </div>`
+    }
+    return `<div class="ccdt-msgview__vault-actions">
+      <div class="ccdt-msgview__vault-banner ccdt-msgview__vault-banner--warn">OWNERSHIP TRANSFER — accepting will remove the previous owner.</div>
+      <button class="ccdt-compose__btn ccdt-compose__btn--accept" data-action="accepttransfer" data-token="${esc(vaultMail.token)}">ACCEPT — BECOME OWNER</button>
+      <button class="ccdt-compose__btn ccdt-compose__btn--danger" data-action="declinetransfer" data-token="${esc(vaultMail.token)}">DECLINE</button>
+    </div>`
+  }
+  if (vaultMail.kind === 'join_request') {
+    if (!vaultMail.token) {
+      return `<div class="ccdt-msgview__vault-actions">
+        <div class="ccdt-msgview__vault-banner">JOIN REQUEST — id missing</div>
+      </div>`
+    }
+    return `<div class="ccdt-msgview__vault-actions">
+      <div class="ccdt-msgview__vault-banner">JOIN REQUEST — approve to admit as a permanent member.</div>
+      <button class="ccdt-compose__btn ccdt-compose__btn--accept" data-action="approvejoin" data-token="${esc(vaultMail.token)}">APPROVE</button>
+      <button class="ccdt-compose__btn ccdt-compose__btn--danger" data-action="declinejoin" data-token="${esc(vaultMail.token)}">DECLINE</button>
+    </div>`
+  }
+  if (vaultMail.kind === 'join_request_result') {
+    return `<div class="ccdt-msgview__vault-actions">
+      <div class="ccdt-msgview__vault-banner ccdt-msgview__vault-banner--info">JOIN REQUEST UPDATE — see body.</div>
+    </div>`
+  }
+  return ''
+}
+
+// Wire the data-action buttons. Each action:
+//   1. Calls the matching do*() wrapper (returns { ok, reason, vault_id, ... })
+//   2. Re-renders the action bar with the result
+//   3. Sets the active vault when applicable
+async function wireVaultMailActions(wb, vaultMail, msg, ctx, onBack) {
+  const bar = wb.body.querySelector('.ccdt-msgview__vault-actions')
+  if (!bar) return
+
+  const showResult = (text, ok) => {
+    bar.innerHTML = `<div class="ccdt-msgview__vault-banner ${ok ? 'ccdt-msgview__vault-banner--ok' : 'ccdt-msgview__vault-banner--err'}">${esc(text)}</div>`
+  }
+
+  const buttons = wb.body.querySelectorAll('[data-action]')
+  buttons.forEach((b) => {
+    b.addEventListener('click', async () => {
+      const action = b.dataset.action
+      const token = b.dataset.token
+      // Disable all buttons while we work
+      buttons.forEach((x) => { x.disabled = true })
+      const setStatus = (t) => { showResult(t, false); bar.querySelector('button')?.remove() }
+      if (action === 'close') { wb.close(); return }
+
+      try {
+        if (action === 'acceptinvite') {
+          const res = await ctx.supabase.rpc('peek_accept_vault_invite', { p_token: token })
+          if (res.error) { showResult(`accept failed: ${res.error.message}`, false); return }
+          if (res.data?.status !== 'ok') { showResult(`accept denied: ${res.data?.reason || 'unknown'}`, false); return }
+          setActiveVault(res.data.vault_id)
+          showResult(`joined vault "${res.data.vault_id}" as ${res.data.role}. active vault updated.`, true)
+        } else if (action === 'accepttransfer') {
+          const res = await ctx.supabase.rpc('peek_accept_transfer', { p_token: token })
+          if (res.error) { showResult(`transfer accept failed: ${res.error.message}`, false); return }
+          if (res.data?.status !== 'ok') { showResult(`transfer denied: ${res.data?.reason || 'unknown'}`, false); return }
+          setActiveVault(res.data.vault_id)
+          showResult(`ownership of "${res.data.vault_id}" accepted. previous owner removed.`, true)
+        } else if (action === 'declinetransfer') {
+          const res = await ctx.supabase.rpc('peek_decline_transfer', { p_token: token })
+          if (res.error) { showResult(`decline failed: ${res.error.message}`, false); return }
+          if (res.data?.status !== 'ok') { showResult(`decline denied: ${res.data?.reason || 'unknown'}`, false); return }
+          showResult(`transfer declined.`, true)
+        } else if (action === 'approvejoin' || action === 'declinejoin') {
+          const ok = action === 'approvejoin'
+          const res = await doResolveJoinRequest(token, ok, ctx)
+          if (!res.ok) { showResult(`${action} failed: ${res.reason}`, false); return }
+          showResult(ok ? 'join request approved — requester is now a permanent member.' : 'join request declined.', true)
+        } else {
+          showResult(`unknown action: ${action}`, false)
+        }
+      } catch (e) {
+        showResult(`unexpected error: ${e.message || e}`, false)
+      }
+    })
+  })
 }
