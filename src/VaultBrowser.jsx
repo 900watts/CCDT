@@ -23,6 +23,11 @@ export default function VaultBrowser({ user }) {
   const [q, setQ] = useState('')
   const [joinStatus, setJoinStatus] = useState('') // '', 'sending', 'sent', 'err:<reason>'
   const [error, setError] = useState('')
+  // ── BRANCH OF POWERS modal state ──
+  const [powerOpen, setPowerOpen] = useState(false)
+  const [powerRows, setPowerRows] = useState([])
+  const [powerLoading, setPowerLoading] = useState(false)
+  const [powerErr, setPowerErr] = useState('')
 
   const ctx = () => ({ supabase, isConfigured, user, demoData: demoStore })
 
@@ -103,6 +108,25 @@ export default function VaultBrowser({ user }) {
       setError(`cannot open: ${res.reason}`)
     }
   }, [ctx])
+
+  // ── BRANCH OF POWERS: load the vault's internal hierarchy and open the modal ──
+  const openPowerStructure = useCallback(async () => {
+    if (!selected) return
+    setPowerOpen(true)
+    setPowerLoading(true)
+    setPowerErr('')
+    setPowerRows([])
+    const { data, error } = await supabase.rpc(
+      'peek_list_vault_power_structure',
+      { p_vault_id: selected }
+    )
+    if (error) {
+      setPowerErr(error.message)
+    } else {
+      setPowerRows(data || [])
+    }
+    setPowerLoading(false)
+  }, [selected])
 
   // ── Filter for the search box ──
   const matches = (v, term) => {
@@ -257,6 +281,15 @@ export default function VaultBrowser({ user }) {
                 {joinStatus === 'switched' && (
                   <span className="vbrowser__ok">active vault is now {info.id}.</span>
                 )}
+
+                {/* BRANCH OF POWERS — visible for any vault the user can see */}
+                <button
+                  className="vbrowser__btn vbrowser__btn--branch"
+                  onClick={openPowerStructure}
+                  title="see the power structure of this vault"
+                >
+                  BRANCH OF POWERS
+                </button>
               </div>
 
               <div className="vbrowser__archives-header">
@@ -282,6 +315,39 @@ export default function VaultBrowser({ user }) {
           )}
         </div>
       </div>
+
+      {/* ── BRANCH OF POWERS modal ── */}
+      {powerOpen && (
+        <div
+          className="vbrowser__power-overlay"
+          onClick={(e) => { if (e.target === e.currentTarget) setPowerOpen(false) }}
+        >
+          <div className="vbrowser__power-modal">
+            <div className="vbrowser__power-title">
+              <span className="vbrowser__power-title-text">BRANCH OF POWERS</span>
+              <button
+                className="vbrowser__power-close"
+                onClick={() => setPowerOpen(false)}
+                aria-label="close"
+              >×</button>
+            </div>
+            <div className="vbrowser__power-sub">
+              vault <b>{info?.id}</b> · {info?.display_name} · {powerRows.length} member{powerRows.length === 1 ? '' : 's'}
+            </div>
+
+            {powerLoading && <div className="vbrowser__power-loading">scanning vault hierarchy…</div>}
+            {powerErr && <div className="vbrowser__power-err">access denied: {powerErr}</div>}
+
+            {!powerLoading && !powerErr && powerRows.length === 0 && (
+              <div className="vbrowser__power-loading">no members in this vault.</div>
+            )}
+
+            {!powerLoading && !powerErr && powerRows.length > 0 && (
+              <PowerPyramid rows={powerRows} />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -300,5 +366,72 @@ function VaultRow({ v, selected, onClick, badge, badgeColor, subtitle, tag }) {
         {tag && <span className="vrow__tag">{tag}</span>}
       </div>
     </button>
+  )
+}
+
+// ── PowerPyramid: 3 visual tiers (apex / middle / base) ──
+// Each row gets a width based on its position in the pyramid — the apex
+// is narrowest, the base widest. The user wanted "top to bottom: highest
+// to lowest" so the rendering order matches the SQL output.
+function PowerPyramid({ rows }) {
+  // Group into the 3 SQL buckets, preserving order within each bucket.
+  const groups = { owner: [], admin: [], member: [] }
+  for (const r of rows) {
+    if (groups[r.bucket]) groups[r.bucket].push(r)
+  }
+
+  const TIER_LABELS = {
+    owner: 'APEX · OWNER',
+    admin: 'TIER 2 · ADMINISTRATORS',
+    member: 'TIER 3 · MEMBERS',
+  }
+
+  // Each tier gets a different color and width (apex narrowest).
+  const TIER_STYLE = {
+    owner:  { color: '#ffd166', width: 60, labelColor: '#ffd166' },
+    admin:  { color: '#38ff9a', width: 80, labelColor: '#38ff9a' },
+    member: { color: '#6a9980', width: 100, labelColor: '#9bb8a8' },
+  }
+
+  const CLR_LABEL = { 1: 'PUBLIC', 2: 'CONFIDENTIAL', 3: 'SECRET', 4: 'TOP SECRET' }
+
+  // Render bottom-up so the apex sits on top.
+  const ordered = ['owner', 'admin', 'member']
+  return (
+    <div className="vbrowser__pyramid">
+      {[...ordered].reverse().map((bucket) => {
+        const tier = TIER_STYLE[bucket]
+        const list = groups[bucket]
+        if (!list || list.length === 0) return null
+        return (
+          <div key={bucket} className={`vbp__tier vbp__tier--${bucket}`}>
+            <div className="vbp__tier-label" style={{ color: tier.labelColor }}>
+              {TIER_LABELS[bucket]} ({list.length})
+            </div>
+            <div className="vbp__tier-row">
+              {list.map((r) => (
+                <div
+                  key={`${bucket}-${r.user_id}`}
+                  className={`vbp__card vbp__card--${bucket}`}
+                  style={{ borderColor: tier.color, color: tier.color, width: `${tier.width}%` }}
+                  title={r.detail}
+                >
+                  <div className="vbp__card-role">
+                    {bucket === 'owner' ? '▲' : bucket === 'admin' ? '◆' : '○'} {r.role || bucket}
+                  </div>
+                  <div className="vbp__card-name">{r.username}</div>
+                  <div className="vbp__card-clr">
+                    {CLR_LABEL[r.clearance] || `L${r.clearance}`}
+                    {r.global_tier >= 2 && (
+                      <span className="vbp__card-global"> · G{r.global_tier}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
