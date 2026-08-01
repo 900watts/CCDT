@@ -41,7 +41,14 @@ create table if not exists public.activity_log (
   action      text not null check (action in (
                 'login','logout','access','create','edit','delete',
                 'send_message','broadcast','promote','demote',
-                'register','register_username','change_password'
+                'register','register_username','change_password',
+                -- vault operations (added with migration_006)
+                'create_vault','delete_vault','set_vault_public',
+                'invite','join_vault','join_request',
+                'join_request_approve','join_request_decline',
+                'set_member','fire','transfer_init',
+                'transfer_accept','transfer_decline',
+                'reset_vault_password','visit_grant','visit_revoke'
               )),
   target      text,                  -- archive_number, username, message_id, etc.
   detail      jsonb default '{}'::jsonb,

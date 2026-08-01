@@ -287,6 +287,54 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
+  // ---- Vault picker (post-login) ----
+  // On login, fetch the user's vault membership. If >1 vaults → show picker.
+  // If 1 vault → set active automatically. If 0 → log an explainer.
+  const [vaults, setVaults] = useState([])
+  const [showVaultPicker, setShowVaultPicker] = useState(false)
+  const [activeVault, setActiveVaultState] = useState(() => {
+    try { return localStorage.getItem('ccdt:activeVault') || null } catch { return null }
+  })
+  useEffect(() => {
+    if (!isConfigured || !user) return
+    let stopped = false
+    const load = async () => {
+      try {
+        const { data, error } = await supabase.rpc('peek_list_my_vaults')
+        if (stopped || error) return
+        const rows = Array.isArray(data) ? data : []
+        setVaults(rows)
+        if (rows.length === 0) {
+          append([
+            { cls: 'ok', text: `YOU ARE NOT IN ANY VAULT` },
+            { cls: 'dim', text: 'ask an admin or O5 to invite you via "invite <you> to <vault>",' },
+            { cls: 'dim', text: 'or type "vault <name>" to create one (requires admin/O5).' }
+          ])
+        } else if (rows.length === 1) {
+          // Auto-set the single vault as active
+          setActiveVaultState(rows[0].vault_id)
+          try { localStorage.setItem('ccdt:activeVault', rows[0].vault_id) } catch {}
+          append([
+            { cls: 'ok', text: `▶ active vault: ${rows[0].vault_id} (auto)` },
+            { cls: 'dim', text: `  ${rows[0].display_name} · role: ${rows[0].role} · vault-clr: ${rows[0].clearance}` }
+          ])
+        } else {
+          // Multi — show picker
+          setShowVaultPicker(true)
+          // Also print a one-liner
+          append([
+            { cls: 'ok', text: `YOU ARE IN ${rows.length} VAULTS — pick one to make active:` },
+            { cls: 'dim', text: '  (a vault picker modal is open above)' }
+          ])
+        }
+      } catch (e) {
+        // silently fail
+      }
+    }
+    load()
+    return () => { stopped = true }
+  }, [user?.id, isConfigured])
+
   const promptText = () => {
     if (mode === 'login-email') return 'EMAIL:'
     if (mode === 'login-pass') return 'PASSWORD:'
@@ -299,8 +347,9 @@ export default function App() {
     if (mode === 'confirm-delete') return 'CONFIRM>'
     const name = user ? (user.email || 'admin').split('@')[0] : 'guest'
     const lvl = getClearance(ctx())
-    const o5Tag = lvl >= 5 ? '★O5★' : ''
-    return `${o5Tag}${name}@CCDT:~$`
+    const o5Tag = lvl >= 5 ? '★O5★' : (lvl >= 2 ? '★admin★' : '')
+    const vaultPart = activeVault ? `/${activeVault}` : ''
+    return `${o5Tag}${name}@CCDT${vaultPart}:~$`
   }
 
   const wizardPrompt = () => {
@@ -657,8 +706,47 @@ export default function App() {
         </div>
         <span className={user ? 'ok' : 'warn'}>
           {user ? `SESSION: ${user.email}` : isConfigured ? 'SESSION: NONE' : 'DEMO MODE'}
+          {activeVault ? ` · vault: ${activeVault}` : ''}
         </span>
       </div>
+
+      {/* Vault picker modal — shown post-login if user is in >1 vault */}
+      {showVaultPicker && (
+        <div className="ccdt-vault-picker-overlay" role="dialog" aria-modal="true">
+          <div className="ccdt-vault-picker">
+            <div className="ccdt-vault-picker__title">SELECT VAULT</div>
+            <div className="ccdt-vault-picker__sub">
+              you are in {vaults.length} vaults. pick one to make active.
+            </div>
+            <div className="ccdt-vault-picker__list">
+              {vaults.map((v) => (
+                <button
+                  key={v.vault_id}
+                  className="ccdt-vault-picker__item"
+                  onClick={() => {
+                    setActiveVaultState(v.vault_id)
+                    try { localStorage.setItem('ccdt:activeVault', v.vault_id) } catch {}
+                    setShowVaultPicker(false)
+                    append([
+                      { cls: 'ok', text: `▶ active vault: ${v.vault_id}` },
+                      { cls: 'dim', text: `  role: ${v.role} · vault-clr: ${v.clearance}` }
+                    ])
+                  }}
+                >
+                  <span className="ccdt-vault-picker__id">{v.vault_id}</span>
+                  <span className="ccdt-vault-picker__name">{v.display_name}</span>
+                  <span className="ccdt-vault-picker__role" data-role={v.role}>{v.role}</span>
+                  <span className="ccdt-vault-picker__clr">vault-clr: {v.clearance}</span>
+                  <span className="ccdt-vault-picker__members">{v.member_count} members</span>
+                </button>
+              ))}
+            </div>
+            <div className="ccdt-vault-picker__cancel">
+              <button onClick={() => setShowVaultPicker(false)}>cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="terminal__main" style={{ display: view === 'terminal' ? 'flex' : 'none' }}>
         <div className="terminal__screen" ref={screenRef}>

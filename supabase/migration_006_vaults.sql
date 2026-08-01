@@ -469,7 +469,8 @@ begin
   end;
   perform public.write_activity(
     'create_vault', new_id,
-    jsonb_build_object('display_name', p_name, 'has_password', pw_hash is not null));
+    jsonb_build_object('display_name', p_name, 'has_password', pw_hash is not null,
+                       '_forced_vault_id', new_id::text));
   return jsonb_build_object('status','ok','vault_id',new_id,'recovery_token', gen_random_uuid());
 end; $$;
 

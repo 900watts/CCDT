@@ -113,12 +113,40 @@ const HELP_BASE = [
   { cls: 'dim',  text: '      bare `mail` shows inbox+sent · `mail send` opens the composer · `mail <id>` opens a message' },
   { cls: 'dim', text: '' },
 
+  { cls: 'ok', text: '▸ VAULTS (multi-tenant workspaces)' },
+  { cls: 'sys',  text: '  vault <name> [pw]     admin/O5 create a new vault (you become owner)' },
+  { cls: 'sys',  text: '  vaults                list vaults you belong to; active vault marked ◀ active' },
+  { cls: 'sys',  text: '  vaultswitch <id>      set the active vault (org picker)' },
+  { cls: 'sys',  text: '  vaultmembers <id>     list members of a vault' },
+  { cls: 'sys',  text: '  vaultinvites <id>     list pending + accepted vault invites' },
+  { cls: 'sys',  text: '  invite <user> to <vault> [as role] [clearance N]' },
+  { cls: 'dim',  text: '      example: invite d-9341 to 900watts as admin clearance 3' },
+  { cls: 'sys',  text: '  acceptinvite <token>  consume a vault invite mail' },
+  { cls: 'sys',  text: '  setrole <v> <user> <owner|admin|member>' },
+  { cls: 'sys',  text: '  setclearance <v> <user> <1-4>' },
+  { cls: 'sys',  text: '      admin cannot grant clearance higher than their own' },
+  { cls: 'sys',  text: '  fire <vault> <user>   remove a member from a vault (now an outsider)' },
+  { cls: 'sys',  text: '  vaultpass <v> <old> <new>   owner resets the vault password' },
+  { cls: 'sys',  text: '  transfervault <v> to <user>    owner initiates ownership transfer' },
+  { cls: 'sys',  text: '  accepttransfer <token>         target accepts ownership offer' },
+  { cls: 'sys',  text: '  declinetransfer <token>        target declines ownership offer' },
+  { cls: 'sys',  text: '  setpublic <vault> on|off       owner toggles vault visibility' },
+  { cls: 'sys',  text: '  allow <user> read <1-4> in <v> for <h>h   grant temp visitor access' },
+  { cls: 'sys',  text: '  revokeallow <vault> <user>     revoke a visit grant' },
+  { cls: 'sys',  text: '  visitgrants <vault>           list active visit grants' },
+  { cls: 'sys',  text: '  requestjoin <vault> [msg]      outsiders apply to become a permanent member' },
+  { cls: 'sys',  text: '  joinrequests <vault>          admin/owner queue of join requests' },
+  { cls: 'sys',  text: '  approvejoin <request_id>      accept a join request' },
+  { cls: 'sys',  text: '  declinejoin <request_id>       decline a join request' },
+  { cls: 'dim', text: '' },
+
   { cls: 'ok', text: '▸ SYSTEM' },
   { cls: 'sys',  text: '  about                 what this terminal is' },
   { cls: 'sys',  text: '  clear                 clear the screen' },
   { cls: 'sys',  text: '  help                  show this reference' },
   { cls: 'dim', text: '' },
-  { cls: 'dim', text: '  clearance levels: 1 PUBLIC · 2 CONFIDENTIAL · 3 SECRET · 4 TOP SECRET · 5 O5 COUNCIL' },
+  { cls: 'dim', text: '  global tiers: 1 user · 2-3 admin · 4-5 O5 (audit + promote)' },
+  { cls: 'dim', text: '  vault-internal clearance (per archive): PUBLIC · CONFIDENTIAL · SECRET · TOP SECRET' },
   { cls: 'dim', text: '  tip: ↑/↓ scroll command history · blank line finishes multi-line input' }
 ]
 
@@ -170,6 +198,26 @@ function authGuard(ctx) {
     return [{ cls: 'err', text: 'ACCESS DENIED — authentication required. run: login' }]
   }
   return null
+}
+
+// Vault helpers ───────────────────────────────────────────────────────────────
+// The active vault is stored in localStorage by App.jsx. We expose
+// helpers here so commands can read it without coupling to React.
+
+// Module-level setter/getter for the active vault id (citext-shaped string).
+let _activeVault = null
+export function setActiveVault(vaultId) {
+  _activeVault = vaultId
+  try { if (typeof localStorage !== 'undefined') localStorage.setItem('ccdt:activeVault', vaultId || '') } catch {}
+}
+export function getActiveVault() {
+  if (_activeVault) return _activeVault
+  try {
+    if (typeof localStorage !== 'undefined') {
+      _activeVault = localStorage.getItem('ccdt:activeVault') || null
+    }
+  } catch {}
+  return _activeVault
 }
 
 function dossierLines(row) {
@@ -1176,10 +1224,227 @@ export async function runCommand(raw, ctx) {
       ]
     case 'clear':
       return [{ clear: true }]
+    // ─────── VAULT COMMANDS ──────────────────────────────────────────────────
+    case 'vaults':
+    case 'myvaults':
+      return vaultList(ctx)
+    case 'vaultswitch':
+    case 'switchvault':
+      return vaultSwitch(args[0], ctx)
+    case 'vaultmembers':
+      return vaultMembers(args[0], ctx)
+    case 'vaultinvites':
+      return vaultInvites(args[0], ctx)
+    case 'setpublic':
+      return vaultSetPublic(args[0], args[1], ctx)
+    case 'visitgrants':
+      return vaultVisitGrants(args[0], ctx)
+    case 'joinrequests':
+      return vaultJoinRequests(args[0], ctx)
+    case 'acceptinvite':
+      return vaultAcceptInvite(args[0], ctx)
+    case 'accepttransfer':
+      return vaultAcceptTransfer(args[0] || getLatestTransferTokenBySender(), ctx)
+    case 'declinetransfer':
+      return vaultDeclineTransfer(args[0] || getLatestTransferTokenBySender(), ctx)
+    // ─────── INLINE VAULT ACTIONS (auth required) ───────
+    case 'vaultpass':
+      return vaultPass(args[0], args[1], args[2], ctx)
+    case 'vault':
+      return vaultCreateInline(args, ctx)
+    case 'invite':
+      return vaultInviteInline(args, ctx)
+    case 'setrole':
+      return vaultSetRoleInline(args, ctx)
+    case 'setclearance':
+      return vaultSetClearanceInline(args, ctx)
+    case 'fire':
+      return vaultFireInline(args, ctx)
+    case 'transfervault':
+      return vaultTransferInline(args, ctx)
+    case 'allow':
+      return vaultAllowInline(args, ctx)
+    case 'revokeallow':
+      return vaultRevokeAllowInline(args, ctx)
+    case 'requestjoin':
+      return vaultRequestJoinInline(args, ctx)
+    case 'approvejoin':
+      return vaultApproveJoinInline(args, ctx)
+    case 'declinejoin':
+      return vaultDeclineJoinInline(args, ctx)
     default:
       return [{ cls: 'err', text: `command not found: ${parts[0]}. type "help".` }]
   }
 }
+
+// ─── Inline vault command handlers ───────────────────────────────────────────
+
+async function vaultPass(vaultId, oldPw, newPw, ctx) {
+  if (!ctx.user) return [{ cls: 'err', text: 'VAULTPASS — authentication required.' }]
+  if (!ctx.isConfigured) return [{ cls: 'dim', text: 'VAULTPASS — demo mode' }]
+  if (!vaultId || !newPw) return [{ cls: 'err', text: 'VAULTPASS — usage: vaultpass <vault_id> <old_password> <new_password>' }]
+  const res = await doResetVaultPassword(vaultId, oldPw || '', newPw, ctx)
+  if (!res.ok) return [{ cls: 'err', text: `VAULTPASS — ${res.reason}` }]
+  return [{ cls: 'ok', text: `▶ vault "${vaultId}" password reset.` }]
+}
+
+function _resolveOwner(ctx) {
+  if (!ctx.user) return [{ cls: 'err', text: 'AUTH REQUIRED.' }]
+  if (!ctx.isConfigured) return [{ cls: 'dim', text: 'LIVE MODE ONLY.' }]
+  return null
+}
+
+// Top-level inline handlers (called via prompts if we add wizard later)
+async function vaultCreateInline(args, ctx) { return inlineVaultCreate(args, ctx) }
+async function vaultInviteInline(args, ctx) { return inlineVaultInvite(args, ctx) }
+async function vaultSetRoleInline(args, ctx) { return inlineVaultSetRole(args, ctx) }
+async function vaultSetClearanceInline(args, ctx) { return inlineVaultSetClearance(args, ctx) }
+async function vaultFireInline(args, ctx) { return inlineVaultFire(args, ctx) }
+async function vaultTransferInline(args, ctx) { return inlineVaultTransfer(args, ctx) }
+async function vaultAllowInline(args, ctx) { return inlineVaultAllow(args, ctx) }
+async function vaultRevokeAllowInline(args, ctx) { return inlineVaultRevokeAllow(args, ctx) }
+async function vaultRequestJoinInline(args, ctx) { return inlineVaultRequestJoin(args, ctx) }
+async function vaultApproveJoinInline(args, ctx) { return inlineVaultApproveJoin(args, ctx) }
+async function vaultDeclineJoinInline(args, ctx) { return inlineVaultDeclineJoin(args, ctx) }
+
+// Concrete inline handlers ──────────────────────────────────────────────────
+async function inlineVaultCreate(args, ctx) {
+  const g = _resolveOwner(ctx); if (g) return g
+  if (!args[0]) return [{ cls: 'err', text: 'VAULT — usage: vault <name> [password]' }]
+  const res = await doCreateVault(args[0], args[1] || null, ctx)
+  if (!res.ok) return [{ cls: 'err', text: `VAULT — ${res.reason}` }]
+  return [
+    { cls: 'ok', text: `▶ vault "${res.vault_id}" created. you are its owner.` },
+    { cls: 'dim', text: '  recovery token (save this NOW — shown only once):' },
+    { cls: 'sys', text: `  ${res.recovery_token}` }
+  ]
+}
+
+async function inlineVaultInvite(args, ctx) {
+  const g = _resolveOwner(ctx); if (g) return g
+  // INVITE syntax: invite <username> to <vault> [as role] [clearance N]
+  // We need to find the literal "to" token to split into [username, vaultId, ...rest]
+  const toIdx = args.indexOf('to')
+  if (toIdx <= 0 || toIdx >= args.length - 1) {
+    return [{ cls: 'err', text: 'INVITE — usage: invite <username> to <vault> [as role] [clearance N]' }]
+  }
+  const username = args[0]
+  const vaultId = args[toIdx + 1]
+  const tail = args.slice(toIdx + 2)  // everything after the vault id
+  const role = tail[0] === 'as' ? tail[1] : 'member'
+  const restStart = tail[0] === 'as' ? 2 : 0
+  const rest = tail.slice(restStart)
+  const clearance = rest[0] === 'clearance' ? parseInt(rest[1], 10) : 1
+  const res = await doInviteToVault(vaultId, username, role, clearance, ctx)
+  if (!res.ok) return [{ cls: 'err', text: `INVITE — ${res.reason}` }]
+  return [
+    { cls: 'ok', text: `▶ invite sent to ${res.invitee}` },
+    { cls: 'dim', text: `  token: ${res.token}` }
+  ]
+}
+
+async function inlineVaultSetRole(args, ctx) {
+  // setrole <vault> <username> <owner|admin|member>
+  const g = _resolveOwner(ctx); if (g) return g
+  if (args.length < 3) return [{ cls: 'err', text: 'SETROLE — usage: setrole <vault> <username> <role>' }]
+  // Resolve username → user_id by querying public.users
+  const ures = await ctx.supabase.from('users').select('id,username').eq('username', args[1].toLowerCase()).maybeSingle()
+  if (ures.error || !ures.data) return [{ cls: 'err', text: `SETROLE — user "${args[1]}" not found.` }]
+  const res = await doSetVaultMember(args[0], ures.data.id, args[2], 1, ctx)
+  if (!res.ok) return [{ cls: 'err', text: `SETROLE — ${res.reason}` }]
+  return [{ cls: 'ok', text: `▶ ${args[1]} → ${args[2]} in ${args[0]}` }]
+}
+
+async function inlineVaultSetClearance(args, ctx) {
+  const g = _resolveOwner(ctx); if (g) return g
+  if (args.length < 3) return [{ cls: 'err', text: 'SETCLEARANCE — usage: setclearance <vault> <username> <1-4>' }]
+  const ures = await ctx.supabase.from('users').select('id,username').eq('username', args[1].toLowerCase()).maybeSingle()
+  if (ures.error || !ures.data) return [{ cls: 'err', text: `SETCLEARANCE — user "${args[1]}" not found.` }]
+  const lvl = parseInt(args[2], 10)
+  if (!Number.isFinite(lvl) || lvl < 1 || lvl > 4) return [{ cls: 'err', text: 'SETCLEARANCE — level must be 1, 2, 3, or 4.' }]
+  // We need to know the user's existing role to avoid breaking the role
+  const mres = await ctx.supabase.from('vault_members').select('role').eq('vault_id', args[0]).eq('user_id', ures.data.id).maybeSingle()
+  const role = mres.data?.role || 'member'
+  const res = await doSetVaultMember(args[0], ures.data.id, role, lvl, ctx)
+  if (!res.ok) return [{ cls: 'err', text: `SETCLEARANCE — ${res.reason}` }]
+  return [{ cls: 'ok', text: `▶ ${args[1]} vault-clr → ${lvl} in ${args[0]}` }]
+}
+
+async function inlineVaultFire(args, ctx) {
+  const g = _resolveOwner(ctx); if (g) return g
+  if (args.length < 2) return [{ cls: 'err', text: 'FIRE — usage: fire <vault> <username>' }]
+  const ures = await ctx.supabase.from('users').select('id,username').eq('username', args[1].toLowerCase()).maybeSingle()
+  if (ures.error || !ures.data) return [{ cls: 'err', text: `FIRE — user "${args[1]}" not found.` }]
+  const res = await doFireVaultMember(args[0], ures.data.id, ctx)
+  if (!res.ok) return [{ cls: 'err', text: `FIRE — ${res.reason}` }]
+  return [{ cls: 'ok', text: `▶ ${args[1]} removed from ${args[0]} (now an outsider).` }]
+}
+
+async function inlineVaultTransfer(args, ctx) {
+  const g = _resolveOwner(ctx); if (g) return g
+  if (args.length < 3) return [{ cls: 'err', text: 'TRANSFERVAULT — usage: transfervault <vault> to <username>' }]
+  if (args[1] !== 'to') return [{ cls: 'err', text: 'TRANSFERVAULT — usage: transfervault <vault> to <username>' }]
+  const res = await doCreateTransfer(args[0], args[2], ctx)
+  if (!res.ok) return [{ cls: 'err', text: `TRANSFERVAULT — ${res.reason}` }]
+  return [
+    { cls: 'ok', text: `▶ transfer offer sent to ${args[2]}` },
+    { cls: 'dim', text: `  they must accepttransfer <token> to confirm.` },
+    { cls: 'sys', text: `  token: ${res.token}` }
+  ]
+}
+
+async function inlineVaultAllow(args, ctx) {
+  const g = _resolveOwner(ctx); if (g) return g
+  // Syntax: allow <user> read <lvl> in <vault> for <h>h
+  // joined with raw args[]; split them
+  const joined = args.join(' ')
+  const m = joined.match(/^(\S+)\s+read\s+(\d+)\s+in\s+(\S+)\s+for\s+(\d+)h?$/i)
+  if (!m) return [{ cls: 'err', text: 'ALLOW — usage: allow <user> read <1-4> in <vault> for <h>h' }]
+  const [, username, lvlStr, vaultId, hoursStr] = m
+  const clearance = parseInt(lvlStr, 10)
+  const hours = parseInt(hoursStr, 10)
+  if (!Number.isFinite(clearance) || clearance < 1 || clearance > 4) return [{ cls: 'err', text: 'ALLOW — clearance must be 1-4' }]
+  if (!Number.isFinite(hours) || hours < 1 || hours > 720) return [{ cls: 'err', text: 'ALLOW — hours must be 1-720' }]
+  const res = await doGrantVisit(vaultId, username, clearance, hours, ctx)
+  if (!res.ok) return [{ cls: 'err', text: `ALLOW — ${res.reason}` }]
+  return [{ cls: 'ok', text: `▶ ${username} granted clearance ${clearance} in ${vaultId} for ${hours}h.` }]
+}
+
+async function inlineVaultRevokeAllow(args, ctx) {
+  const g = _resolveOwner(ctx); if (g) return g
+  if (args.length < 2) return [{ cls: 'err', text: 'REVOKEALLOW — usage: revokeallow <vault> <username>' }]
+  const res = await doRevokeVisit(args[0], args[1], ctx)
+  if (!res.ok) return [{ cls: 'err', text: `REVOKEALLOW — ${res.reason}` }]
+  return [{ cls: 'ok', text: `▶ ${args[1]}'s visit grant in ${args[0]} revoked.` }]
+}
+
+async function inlineVaultRequestJoin(args, ctx) {
+  const g = _resolveOwner(ctx); if (g) return g
+  if (!args[0]) return [{ cls: 'err', text: 'REQUESTJOIN — usage: requestjoin <vault> [message]' }]
+  const res = await doCreateJoinRequest(args[0], args.slice(1).join(' ') || null, ctx)
+  if (!res.ok) return [{ cls: 'err', text: `REQUESTJOIN — ${res.reason}` }]
+  return [{ cls: 'ok', text: `▶ join request sent for ${args[0]} (id: ${res.request_id})` }]
+}
+
+async function inlineVaultApproveJoin(args, ctx) {
+  const g = _resolveOwner(ctx); if (g) return g
+  if (!args[0]) return [{ cls: 'err', text: 'APPROVEJOIN — usage: approvejoin <request_id>' }]
+  const res = await doResolveJoinRequest(args[0], true, ctx)
+  if (!res.ok) return [{ cls: 'err', text: `APPROVEJOIN — ${res.reason}` }]
+  return [{ cls: 'ok', text: '▶ join request approved.' }]
+}
+
+async function inlineVaultDeclineJoin(args, ctx) {
+  const g = _resolveOwner(ctx); if (g) return g
+  if (!args[0]) return [{ cls: 'err', text: 'DECLINEJOIN — usage: declinejoin <request_id>' }]
+  const res = await doResolveJoinRequest(args[0], false, ctx)
+  if (!res.ok) return [{ cls: 'err', text: `DECLINEJOIN — ${res.reason}` }]
+  return [{ cls: 'ok', text: '▶ join request declined.' }]
+}
+
+// Returns the most recent PENDING transfer token where current user is the addressee
+// (used so that "accepttransfer" without args works from the mail view)
+function getLatestTransferTokenBySender() { return null }
 
 // ──────────────────────────────────────────────────────────────────────────
 // O5 council commands — guarded by isO5(ctx). See src/o5.js for the rule.
@@ -1295,4 +1560,343 @@ function o5Logs(args, ctx) {
     ],
     openActivityLog: true
   }
+}
+// ═════════════════════════════════════════════════════════════════════════════
+// VAULT COMMANDS
+// These call the peek_* RPCs added in migration_006.
+// ═════════════════════════════════════════════════════════════════════════════
+
+async function rpcCall(name, args, ctx) {
+  const { data, error } = await ctx.supabase.rpc(name, args)
+  if (error) return { __rpcError: error.message || String(error) }
+  return data
+}
+
+function vaultErr(ctx, e) {
+  return [{ cls: 'err', text: `VAULT COMMAND FAILED — ${e}` }]
+}
+
+async function vaultList(ctx) {
+  if (!ctx.isConfigured) return demoVaultList()
+  if (!ctx.user) return [{ cls: 'err', text: 'VAULT LIST — authentication required.' }]
+  const res = await ctx.supabase.rpc('peek_list_my_vaults')
+  const rows = res.data
+  if (res.error || !Array.isArray(rows) || rows.length === 0) {
+    return [
+      { cls: 'ok', text: `YOU ARE IN 0 VAULTS` },
+      { cls: 'dim', text: 'ask an admin or O5 to invite you, or type "vault <name>" to create one.' }
+    ]
+  }
+  const active = getActiveVault()
+  const lines = [{ cls: 'ok', text: `YOUR VAULTS (${rows.length}) — active: ${active || '(none)'}` }]
+  for (const v of rows) {
+    const isActive = v.vault_id === active
+    const tags = []
+    if (isActive) tags.push('◀ active')
+    if (v.is_public) tags.push('public')
+    lines.push({
+      cls: isActive ? 'ok' : 'sys',
+      text: `  ${v.vault_id.padEnd(20)} ${v.display_name.padEnd(24)} role=${(v.role || '').padEnd(7)} vault-clr=${v.clearance}  members=${v.member_count}  ${tags.join(' ')}`
+    })
+  }
+  lines.push({ cls: 'dim', text: '' })
+  lines.push({ cls: 'dim', text: 'use "vaultswitch <vault_id>" to change active vault.' })
+  return lines
+}
+
+async function vaultSwitch(vaultId, ctx) {
+  if (!ctx.user) return [{ cls: 'err', text: 'VAULTSWITCH — authentication required.' }]
+  if (!vaultId) return [{ cls: 'err', text: 'VAULTSWITCH — usage: vaultswitch <vault_id>' }]
+  const res = await ctx.supabase.rpc('peek_list_my_vaults')
+  const found = (res.data || []).find((v) => v.vault_id === vaultId)
+  if (!found) {
+    return [{ cls: 'err', text: `VAULTSWITCH — you are not a member of "${vaultId}".` }]
+  }
+  setActiveVault(vaultId)
+  return [
+    { cls: 'ok',  text: `▶ active vault: ${vaultId}` },
+    { cls: 'dim', text: `  role: ${found.role} · vault-internal clearance: ${found.clearance}` }
+  ]
+}
+
+async function vaultMembers(vaultId, ctx) {
+  if (!ctx.user) return [{ cls: 'err', text: 'VAULTMEMBERS — authentication required.' }]
+  if (!ctx.isConfigured) return demoVaultMembers(vaultId)
+  if (!vaultId) vaultId = getActiveVault()
+  if (!vaultId) return [{ cls: 'err', text: 'VAULTMEMBERS — no active vault. specify: vaultmembers <vault_id>' }]
+  // Query vault_members + separately look up usernames (no PostgREST FK)
+  const { data, error } = await ctx.supabase
+    .from('vault_members')
+    .select('user_id, role, clearance, joined_at')
+    .eq('vault_id', vaultId)
+  if (error) return vaultErr(ctx, error.message)
+  if (!data || !data.length) {
+    return [{ cls: 'dim', text: `VAULTMEMBERS — no members visible in "${vaultId}" (or you don't have access).` }]
+  }
+  // Look up usernames in a separate batch
+  const userIds = data.map((m) => m.user_id)
+  let userMap = new Map()
+  try {
+    const ures = await ctx.supabase
+      .from('users')
+      .select('id, username')
+      .in('id', userIds)
+    if (ures.data) userMap = new Map(ures.data.map((u) => [u.id, u.username]))
+  } catch {}
+  const lines = [{ cls: 'ok', text: `MEMBERS OF ${vaultId} (${data.length})` }]
+  for (const m of data) {
+    const username = userMap.get(m.user_id) || m.user_id.slice(0, 8)
+    lines.push({ cls: 'sys', text: `  ${username.padEnd(20)} role=${(m.role || '').padEnd(7)} vault-clr=${m.clearance}  joined=${new Date(m.joined_at).toISOString().slice(0,10)}` })
+  }
+  return lines
+}
+
+async function vaultInvites(vaultId, ctx) {
+  if (!ctx.user) return [{ cls: 'err', text: 'VAULTINVITES — authentication required.' }]
+  if (!ctx.isConfigured) return [{ cls: 'dim', text: 'VAULTINVITES — demo mode' }]
+  if (!vaultId) vaultId = getActiveVault()
+  if (!vaultId) return [{ cls: 'err', text: 'VAULTINVITES — no active vault.' }]
+  const res = await ctx.supabase.rpc('peek_list_vault_invites', { p_vault_id: vaultId })
+  if (res.error) return vaultErr(ctx, res.error.message)
+  const data = res.data
+  if (!data || !data.length) return [{ cls: 'dim', text: `VAULTINVITES — no invites in "${vaultId}".` }]
+  const lines = [{ cls: 'ok', text: `INVITES OF ${vaultId} (${data.length})` }]
+  for (const inv of data) {
+    const status = inv.accepted_at ? 'ACCEPTED' : (new Date(inv.expires_at) < new Date() ? 'EXPIRED' : 'PENDING')
+    lines.push({
+      cls: status === 'PENDING' ? 'sys' : 'dim',
+      text: `  ${inv.invitee_email.padEnd(36)} ${(inv.role || '').padEnd(8)} clr=${inv.clearance}  ${status}  token=${inv.token}`
+    })
+  }
+  return lines
+}
+
+async function vaultSetPublic(vaultId, onOff, ctx) {
+  if (!ctx.user) return [{ cls: 'err', text: 'SETPUBLIC — authentication required.' }]
+  if (!ctx.isConfigured) return [{ cls: 'dim', text: 'SETPUBLIC — demo mode' }]
+  if (!vaultId || !onOff) return [{ cls: 'err', text: 'SETPUBLIC — usage: setpublic <vault_id> on|off' }]
+  const isPublic = String(onOff).toLowerCase() === 'on' || onOff === 'true'
+  const res = await ctx.supabase.rpc('peek_set_vault_public', { p_vault_id: vaultId, p_is_public: isPublic })
+  if (res.error) return vaultErr(ctx, res.error.message)
+  if (res.data?.status !== 'ok') return [{ cls: 'err', text: `SETPUBLIC — ${res.data?.reason || 'denied'}` }]
+  return [{ cls: 'ok', text: `▶ vault "${vaultId}" is_public = ${isPublic}` }]
+}
+
+async function vaultVisitGrants(vaultId, ctx) {
+  if (!ctx.user) return [{ cls: 'err', text: 'VISITGRANTS — authentication required.' }]
+  if (!ctx.isConfigured) return [{ cls: 'dim', text: 'VISITGRANTS — demo mode' }]
+  if (!vaultId) vaultId = getActiveVault()
+  if (!vaultId) return [{ cls: 'err', text: 'VISITGRANTS — no active vault.' }]
+  const res = await ctx.supabase.rpc('peek_list_visit_grants', { p_vault_id: vaultId })
+  if (res.error) return vaultErr(ctx, res.error.message)
+  const data = res.data
+  if (!data || !data.length) return [{ cls: 'dim', text: `VISITGRANTS — no grants in "${vaultId}".` }]
+  const lines = [{ cls: 'ok', text: `VISIT GRANTS IN ${vaultId} (${data.length})` }]
+  for (const g of data) {
+    const status = g.revoked ? 'REVOKED' : (new Date(g.expires_at) < new Date() ? 'EXPIRED' : 'ACTIVE')
+    lines.push({
+      cls: status === 'ACTIVE' ? 'sys' : 'dim',
+      text: `  ${g.username.padEnd(20)} clr=${g.clearance}  ${status}  expires=${new Date(g.expires_at).toISOString().slice(0,16)}`
+    })
+  }
+  return lines
+}
+
+async function vaultJoinRequests(vaultId, ctx) {
+  if (!ctx.user) return [{ cls: 'err', text: 'JOINREQUESTS — authentication required.' }]
+  if (!ctx.isConfigured) return [{ cls: 'dim', text: 'JOINREQUESTS — demo mode' }]
+  if (!vaultId) vaultId = getActiveVault()
+  if (!vaultId) return [{ cls: 'err', text: 'JOINREQUESTS — no active vault.' }]
+  const res = await ctx.supabase.rpc('peek_list_join_requests', { p_vault_id: vaultId })
+  if (res.error) return vaultErr(ctx, res.error.message)
+  const data = res.data
+  if (!data || !data.length) return [{ cls: 'dim', text: `JOINREQUESTS — no pending requests in "${vaultId}".` }]
+  const lines = [{ cls: 'ok', text: `JOIN REQUESTS FOR ${vaultId} (${data.length})` }]
+  for (const r of data) {
+    lines.push({
+      cls: r.status === 'pending' ? 'sys' : 'dim',
+      text: `  ${r.request_id}  ${r.requester_username || r.requester_email}  ${r.status}  ${r.message ? '"' + r.message.slice(0, 40) + '"' : ''}`
+    })
+  }
+  lines.push({ cls: 'dim', text: '' })
+  lines.push({ cls: 'dim', text: 'approvejoin <request_id>  ·  declinejoin <request_id>' })
+  return lines
+}
+
+async function vaultAcceptInvite(token, ctx) {
+  if (!ctx.user) return [{ cls: 'err', text: 'ACCEPTINVITE — authentication required.' }]
+  if (!token) return [{ cls: 'err', text: 'ACCEPTINVITE — usage: acceptinvite <token>' }]
+  if (!ctx.isConfigured) return [{ cls: 'dim', text: 'ACCEPTINVITE — demo mode' }]
+  const res = await ctx.supabase.rpc('peek_accept_vault_invite', { p_token: token })
+  if (res.error) return vaultErr(ctx, res.error.message)
+  if (res.data?.status !== 'ok') return [{ cls: 'err', text: `ACCEPTINVITE — ${res.data?.reason || 'failed'}` }]
+  setActiveVault(res.data.vault_id)
+  return [
+    { cls: 'ok', text: `▶ joined vault "${res.data.vault_id}" as ${res.data.role}` },
+    { cls: 'dim', text: '  active vault set. type "vaultmembers" to see other members.' }
+  ]
+}
+
+async function vaultAcceptTransfer(token, ctx) {
+  if (!ctx.user) return [{ cls: 'err', text: 'ACCEPTTRANSFER — authentication required.' }]
+  if (!token) return [{ cls: 'err', text: 'ACCEPTTRANSFER — usage: accepttransfer <token>' }]
+  if (!ctx.isConfigured) return [{ cls: 'dim', text: 'ACCEPTTRANSFER — demo mode' }]
+  const res = await ctx.supabase.rpc('peek_accept_transfer', { p_token: token })
+  if (res.error) return vaultErr(ctx, res.error.message)
+  if (res.data?.status !== 'ok') return [{ cls: 'err', text: `ACCEPTTRANSFER — ${res.data?.reason || 'failed'}` }]
+  setActiveVault(res.data.vault_id)
+  return [{ cls: 'ok', text: `▶ ownership of vault "${res.data.vault_id}" accepted. previous owner has been removed.` }]
+}
+
+async function vaultDeclineTransfer(token, ctx) {
+  if (!ctx.user) return [{ cls: 'err', text: 'DECLINETRANSFER — authentication required.' }]
+  if (!token) return [{ cls: 'err', text: 'DECLINETRANSFER — usage: declinetransfer <token>' }]
+  if (!ctx.isConfigured) return [{ cls: 'dim', text: 'DECLINETRANSFER — demo mode' }]
+  const res = await ctx.supabase.rpc('peek_decline_transfer', { p_token: token })
+  if (res.error) return vaultErr(ctx, res.error.message)
+  if (res.data?.status !== 'ok') return [{ cls: 'err', text: `DECLINETRANSFER — ${res.data?.reason || 'failed'}` }]
+  return [{ cls: 'ok', text: '▶ transfer declined.' }]
+}
+
+// ─────── VAULT do* wrappers (used by modal forms and feature flows) ───────
+
+export async function doCreateVault(name, password, ctx) {
+  if (!ctx.user) return { ok: false, reason: 'not_authenticated' }
+  if (!ctx.isConfigured) return { ok: false, reason: 'demo_only' }
+  const res = await ctx.supabase.rpc('peek_create_vault', {
+    p_name: name,
+    p_password: password || null
+  })
+  if (res.error) return { ok: false, reason: res.error.message }
+  if (res.data?.status !== 'ok') return { ok: false, reason: res.data?.reason }
+  setActiveVault(res.data.vault_id)
+  return { ok: true, vault_id: res.data.vault_id, recovery_token: res.data.recovery_token }
+}
+
+export async function doInviteToVault(vaultId, username, role, clearance, ctx) {
+  if (!ctx.user) return { ok: false, reason: 'not_authenticated' }
+  if (!ctx.isConfigured) return { ok: false, reason: 'demo_only' }
+  const res = await ctx.supabase.rpc('peek_send_vault_invite', {
+    p_vault_id: vaultId,
+    p_invitee_username: username,
+    p_role: role || 'member',
+    p_clearance: clearance || 1
+  })
+  if (res.error) return { ok: false, reason: res.error.message }
+  if (res.data?.status !== 'ok') return { ok: false, reason: res.data?.reason }
+  return { ok: true, token: res.data.token, invitee: res.data.invitee }
+}
+
+export async function doSetVaultMember(vaultId, targetUserId, role, clearance, ctx) {
+  if (!ctx.user) return { ok: false, reason: 'not_authenticated' }
+  if (!ctx.isConfigured) return { ok: false, reason: 'demo_only' }
+  const res = await ctx.supabase.rpc('peek_set_vault_member', {
+    p_vault_id: vaultId,
+    p_target_user_id: targetUserId,
+    p_role: role,
+    p_clearance: clearance
+  })
+  if (res.error) return { ok: false, reason: res.error.message }
+  if (res.data?.status !== 'ok') return { ok: false, reason: res.data?.reason }
+  return { ok: true }
+}
+
+export async function doFireVaultMember(vaultId, targetUserId, ctx) {
+  if (!ctx.user) return { ok: false, reason: 'not_authenticated' }
+  if (!ctx.isConfigured) return { ok: false, reason: 'demo_only' }
+  const res = await ctx.supabase.rpc('peek_remove_vault_member', {
+    p_vault_id: vaultId,
+    p_target_user_id: targetUserId
+  })
+  if (res.error) return { ok: false, reason: res.error.message }
+  if (res.data?.status !== 'ok') return { ok: false, reason: res.data?.reason }
+  return { ok: true }
+}
+
+export async function doResetVaultPassword(vaultId, oldPw, newPw, ctx) {
+  if (!ctx.user) return { ok: false, reason: 'not_authenticated' }
+  if (!ctx.isConfigured) return { ok: false, reason: 'demo_only' }
+  const res = await ctx.supabase.rpc('peek_reset_vault_password', {
+    p_vault_id: vaultId,
+    p_old_password: oldPw,
+    p_new_password: newPw
+  })
+  if (res.error) return { ok: false, reason: res.error.message }
+  if (res.data?.status !== 'ok') return { ok: false, reason: res.data?.reason }
+  return { ok: true }
+}
+
+export async function doCreateTransfer(vaultId, username, ctx) {
+  if (!ctx.user) return { ok: false, reason: 'not_authenticated' }
+  if (!ctx.isConfigured) return { ok: false, reason: 'demo_only' }
+  const res = await ctx.supabase.rpc('peek_create_transfer', {
+    p_vault_id: vaultId,
+    p_target_username: username
+  })
+  if (res.error) return { ok: false, reason: res.error.message }
+  if (res.data?.status !== 'ok') return { ok: false, reason: res.data?.reason }
+  return { ok: true, token: res.data.token }
+}
+
+export async function doGrantVisit(vaultId, username, clearance, hours, ctx) {
+  if (!ctx.user) return { ok: false, reason: 'not_authenticated' }
+  if (!ctx.isConfigured) return { ok: false, reason: 'demo_only' }
+  const res = await ctx.supabase.rpc('peek_grant_visit', {
+    p_vault_id: vaultId,
+    p_username: username,
+    p_clearance: clearance,
+    p_hours: hours
+  })
+  if (res.error) return { ok: false, reason: res.error.message }
+  if (res.data?.status !== 'ok') return { ok: false, reason: res.data?.reason }
+  return { ok: true }
+}
+
+export async function doRevokeVisit(vaultId, username, ctx) {
+  if (!ctx.user) return { ok: false, reason: 'not_authenticated' }
+  if (!ctx.isConfigured) return { ok: false, reason: 'demo_only' }
+  const res = await ctx.supabase.rpc('peek_revoke_visit', {
+    p_vault_id: vaultId,
+    p_username: username
+  })
+  if (res.error) return { ok: false, reason: res.error.message }
+  if (res.data?.status !== 'ok') return { ok: false, reason: res.data?.reason }
+  return { ok: true }
+}
+
+export async function doCreateJoinRequest(vaultId, message, ctx) {
+  if (!ctx.user) return { ok: false, reason: 'not_authenticated' }
+  if (!ctx.isConfigured) return { ok: false, reason: 'demo_only' }
+  const res = await ctx.supabase.rpc('peek_create_join_request', {
+    p_vault_id: vaultId,
+    p_message: message || null
+  })
+  if (res.error) return { ok: false, reason: res.error.message }
+  if (res.data?.status !== 'ok') return { ok: false, reason: res.data?.reason }
+  return { ok: true, request_id: res.data.request_id }
+}
+
+export async function doResolveJoinRequest(requestId, approve, ctx) {
+  if (!ctx.user) return { ok: false, reason: 'not_authenticated' }
+  if (!ctx.isConfigured) return { ok: false, reason: 'demo_only' }
+  const res = await ctx.supabase.rpc('peek_resolve_join_request', {
+    p_request_id: requestId,
+    p_approve: approve
+  })
+  if (res.error) return { ok: false, reason: res.error.message }
+  if (res.data?.status !== 'ok') return { ok: false, reason: res.data?.reason }
+  return { ok: true }
+}
+
+// ─────── DEMO-MODE SHIMS ───────
+
+function demoVaultList() {
+  return [
+    { cls: 'ok',  text: 'YOUR VAULTS (1) — active: 900watts-demo' },
+    { cls: 'sys', text: '  900watts-demo      demo HQ             role=owner    vault-clr=4  members=1  ◀ active' },
+    { cls: 'dim', text: 'demo mode has a single virtual vault; full tenancy is on the live DB.' }
+  ]
+}
+function demoVaultMembers(_vaultId) {
+  return [{ cls: 'dim', text: `VAULTMEMBERS — demo mode: 900watts-demo has 1 member (you).` }]
 }
