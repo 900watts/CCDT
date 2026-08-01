@@ -11,6 +11,7 @@ import { bindPresence, unbindPresence } from './presence'
 import { triggerO5Broadcast } from './o5Popup'
 import { openActivityLogWindow } from './o5Browser'
 import DatabaseView from './DatabaseView'
+import VaultBrowser from './VaultBrowser'
 
 const CLASS_COLOR = {
   SECRET: 'var(--secret)',
@@ -701,7 +702,7 @@ export default function App() {
             className={`tab${view === 'database' ? ' tab--active' : ''}`}
             onClick={() => setView('database')}
           >
-            DATABASE
+            VAULTS
           </button>
         </div>
         <span className={user ? 'ok' : 'warn'}>
@@ -805,7 +806,7 @@ export default function App() {
         </form>
       </div>
 
-      {view === 'database' && <DatabaseView user={user} />}
+      {view === 'database' && <VaultBrowser user={user} />}
 
       <input
         ref={fileInputRef}

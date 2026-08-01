@@ -1514,3 +1514,280 @@ html, body, #root {
   color: #38ff9a;
   border-color: #38ff9a;
 }
+
+/* ─── VAULTS browser (replaces old DATABASE view) ─────────────────────── */
+.vbrowser {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: inherit;
+}
+.vbrowser__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #07120a 0%, #050b08 100%);
+}
+.vbrowser__title {
+  color: #38ff9a;
+  font-weight: 800;
+  letter-spacing: 3px;
+  font-size: 14px;
+  text-shadow: 0 0 12px rgba(56, 255, 154, 0.45);
+}
+.vbrowser__count {
+  color: #6a9980;
+  font-size: 11px;
+  letter-spacing: 1px;
+  margin-left: -4px;
+}
+.vbrowser__search {
+  flex: 1;
+  background: rgba(56, 255, 154, 0.05);
+  color: #b6ffd9;
+  border: 1px solid rgba(56, 255, 154, 0.2);
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  outline: none;
+  transition: border-color 180ms var(--ease-out);
+}
+.vbrowser__search:focus { border-color: #38ff9a; }
+.vbrowser__btn {
+  background: transparent;
+  color: #6a9980;
+  border: 1px solid rgba(56, 255, 154, 0.25);
+  font-family: inherit;
+  font-size: 14px;
+  padding: 4px 10px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: color 180ms var(--ease-out), border-color 180ms var(--ease-out);
+}
+.vbrowser__btn:hover { color: #38ff9a; border-color: #38ff9a; }
+.vbrowser__btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.vbrowser__err {
+  background: rgba(255, 91, 91, 0.1);
+  border-left: 3px solid #ff5b5b;
+  color: #ff9999;
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+/* ── Split layout: list left, detail right ── */
+.vbrowser__split {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  overflow: hidden;
+}
+
+/* ── Left list ── */
+.vbrowser__list {
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  background: rgba(56, 255, 154, 0.02);
+}
+.vbrowser__list-header {
+  color: #6a9980;
+  font-size: 10px;
+  letter-spacing: 2px;
+  padding: 10px 14px 4px;
+  text-transform: uppercase;
+}
+.vbrowser__empty {
+  color: #4d7560;
+  font-size: 12px;
+  padding: 24px 18px;
+  text-align: center;
+}
+.vrow {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(56, 255, 154, 0.06);
+  border-left: 2px solid transparent;
+  padding: 12px 14px;
+  font-family: inherit;
+  color: #b6ffd9;
+  cursor: pointer;
+  transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.vrow:hover {
+  background: rgba(56, 255, 154, 0.05);
+  border-left-color: rgba(56, 255, 154, 0.5);
+}
+.vrow--selected {
+  background: rgba(56, 255, 154, 0.12);
+  border-left-color: #38ff9a;
+}
+.vrow__id {
+  color: #38ff9a;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+.vrow__name {
+  color: #b6ffd9;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+.vrow__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #6a9980;
+}
+.vrow__badge {
+  border: 1px solid;
+  padding: 1px 6px;
+  border-radius: 2px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.vrow__sub { font-size: 10px; }
+.vrow__tag { color: #38ff9a; font-weight: 700; margin-left: auto; }
+
+/* ── Right detail pane ── */
+.vbrowser__detail {
+  overflow-y: auto;
+  background: var(--bg);
+}
+.vbrowser__detail-empty {
+  padding: 60px 30px;
+  color: #4d7560;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  text-align: center;
+  line-height: 2;
+}
+.vbrowser__detail-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.vbrowser__detail-head {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+.vbrowser__detail-id {
+  color: #38ff9a;
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: 2px;
+  text-shadow: 0 0 16px rgba(56, 255, 154, 0.4);
+  margin-bottom: 4px;
+}
+.vbrowser__detail-name {
+  color: #b6ffd9;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.vbrowser__detail-meta {
+  color: #6a9980;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+.vbrowser__detail-mine {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #b6ffd9;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.vbrowser__detail-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.vbrowser__btn--primary {
+  background: linear-gradient(180deg, #38ff9a 0%, #2bd07f 100%);
+  color: #050b08;
+  border: 1px solid #38ff9a;
+  font-weight: 800;
+  letter-spacing: 2px;
+  padding: 8px 18px;
+  box-shadow: 0 0 14px rgba(56, 255, 154, 0.4);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: box-shadow 180ms var(--ease-out);
+}
+.vbrowser__btn--primary:hover:not(:disabled) {
+  box-shadow: 0 0 22px rgba(56, 255, 154, 0.7);
+}
+.vbrowser__badge {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+}
+.vbrowser__badge--own { color: #ffd166; background: rgba(255, 209, 102, 0.1); }
+.vbrowser__ok { color: #38ff9a; font-size: 12px; letter-spacing: 0.5px; }
+.vbrowser__err-inline { color: #ff7e7e; font-size: 12px; }
+
+/* ── Archive list inside the detail pane ── */
+.vbrowser__archives-header {
+  color: #6a9980;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.vbrowser__archives {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.vbrowser__archive-card {
+  background: rgba(56, 255, 154, 0.04);
+  border: 1px solid rgba(56, 255, 154, 0.2);
+  color: #b6ffd9;
+  font-family: inherit;
+  text-align: left;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background 180ms var(--ease-out), border-color 180ms var(--ease-out), transform 100ms var(--ease-out);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.vbrowser__archive-card:hover {
+  background: rgba(56, 255, 154, 0.12);
+  border-color: #38ff9a;
+  transform: translateX(2px);
+}
+.vbrowser__archive-card:active { transform: translateX(2px) scale(0.99); }
+.vbrowser__archive-num {
+  color: #38ff9a;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+.vbrowser__archive-title {
+  font-size: 12px;
+  color: #b6ffd9;
+}
+.vbrowser__archive-dept {
+  font-size: 10px;
+  color: #6a9980;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
