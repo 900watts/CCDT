@@ -1709,29 +1709,102 @@ html, body, #root {
   letter-spacing: 1px;
   text-transform: uppercase;
 }
+/* ── Action bar — the section that holds vault operations ── */
 .vbrowser__detail-actions {
   display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-items: center;
+}
+
+.vbrowser__actionbar {
+  border: 1px solid rgba(56, 255, 154, 0.18);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+}
+.vbrowser__actionbar--admin {
+  border-color: rgba(255, 209, 102, 0.35);
+  background: rgba(255, 209, 102, 0.04);
+}
+.vbrowser__actionbar--member {
+  border-color: rgba(56, 255, 154, 0.25);
+}
+.vbrowser__actionbar-label {
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #6a9980;
+}
+.vbrowser__actionbar--admin .vbrowser__actionbar-label {
+  color: #ffd166;
+}
+.vbrowser__actionbar-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
   flex-wrap: wrap;
 }
+.vbrowser__actionbar-row > .vbrowser__btn {
+  /* Force every button in the actionbar to be the same height regardless of
+     which modifier class it has. The base height/line-height applies to
+     all three button variants — primary, branch, ghost. */
+  height: 34px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out),
+              color 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
+  border-radius: 0;
+}
+.vbrowser__actionbar-row > .vbrowser__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.vbrowser__actionbar-row > .vbrowser__btn svg {
+  flex-shrink: 0;
+}
+.vbrowser__actionbar-aside {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.08);
+  border: 1px solid rgba(255, 209, 102, 0.4);
+  padding: 0 12px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+}
+.vbrowser__actionbar-status {
+  font-size: 10px;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+
+/* ── Button variants — all share the same height/typography set above ── */
 .vbrowser__btn--primary {
-  background: linear-gradient(180deg, #38ff9a 0%, #2bd07f 100%);
+  background: #38ff9a;
   color: #050b08;
   border: 1px solid #38ff9a;
-  font-weight: 800;
-  letter-spacing: 2px;
-  padding: 8px 18px;
-  box-shadow: 0 0 14px rgba(56, 255, 154, 0.4);
-  font-family: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  text-transform: uppercase;
-  transition: box-shadow 180ms var(--ease-out);
+  box-shadow: 0 0 0 1px rgba(56, 255, 154, 0.15) inset;
 }
 .vbrowser__btn--primary:hover:not(:disabled) {
-  box-shadow: 0 0 22px rgba(56, 255, 154, 0.7);
+  background: #6effce;
+  box-shadow: 0 0 12px rgba(56, 255, 154, 0.5);
 }
+
 .vbrowser__badge {
   font-size: 11px;
   letter-spacing: 1.5px;
@@ -1792,36 +1865,6 @@ html, body, #root {
   text-transform: uppercase;
 }
 /* ── BRANCH OF POWERS modal + pyramid ────────────────────────────────── */
-.vbrowser__btn--branch {
-  background: rgba(255, 209, 102, 0.06) !important;
-  border: 1px solid rgba(255, 209, 102, 0.45) !important;
-  color: #ffd166 !important;
-  margin-top: 14px;
-  padding: 8px 18px !important;
-  letter-spacing: 2.5px;
-  font-weight: 700;
-  position: relative;
-  overflow: hidden;
-  display: inline-block !important;
-  align-self: flex-start;
-  animation: vbp-btn-pulse 2.4s ease-in-out infinite;
-}
-@keyframes vbp-btn-pulse {
-  0%, 100% { box-shadow: 0 0 0 rgba(255, 209, 102, 0) }
-  50% { box-shadow: 0 0 14px rgba(255, 209, 102, 0.25) }
-}
-.vbrowser__btn--branch::before {
-  content: "◆";
-  margin-right: 8px;
-  color: #ffd166;
-  text-shadow: 0 0 6px rgba(255, 209, 102, 0.6);
-}
-.vbrowser__btn--branch:hover {
-  background: rgba(255, 209, 102, 0.14) !important;
-  border-color: #ffd166 !important;
-  box-shadow: 0 0 18px rgba(255, 209, 102, 0.45);
-  animation: none;
-}
 
 .vbrowser__power-overlay {
   position: fixed;
@@ -1992,23 +2035,7 @@ html, body, #root {
 .vbp__tier--member .vbp__tier-row { padding: 0 0%; }
 /* ── VAULT SETTINGS GUI ─────────────────────────────────────────────────── */
 
-/* MANAGE button in the vault overview actions */
-.vbrowser__btn--manage {
-  background: rgba(56, 255, 154, 0.08) !important;
-  border: 1px solid rgba(56, 255, 154, 0.45) !important;
-  color: #38ff9a !important;
-  margin-top: 8px;
-  letter-spacing: 2px;
-  font-weight: 700;
-  align-self: flex-start;
-  position: relative;
-  overflow: hidden;
-}
-.vbrowser__btn--manage:hover {
-  background: rgba(56, 255, 154, 0.16) !important;
-  border-color: #38ff9a !important;
-  box-shadow: 0 0 14px rgba(56, 255, 154, 0.3);
-}
+/* MANAGE button styles are now in the actionbar block above */
 
 /* Modal overlay */
 .vset__overlay {

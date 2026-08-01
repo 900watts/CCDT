@@ -248,79 +248,104 @@ export default function VaultBrowser({ user }) {
                 )}
               </div>
 
-              <div className="vbrowser__detail-actions">
-                {isOwnVault && (
-                  <div className="vbrowser__badge vbrowser__badge--own">
-                    you own this vault. open the terminal to manage it.
+              {/* ── ADMIN ACTIONS (owner/admin only) — full vault management GUI ── */}
+              {(isOwnVault || myRole === 'admin') && (
+                <div className="vbrowser__actionbar vbrowser__actionbar--admin">
+                  <div className="vbrowser__actionbar-label">ADMIN · {myRole?.toUpperCase()}</div>
+                  <div className="vbrowser__actionbar-row">
+                    <button
+                      className="vbrowser__btn vbrowser__btn--manage"
+                      onClick={() => setSettingsOpen(true)}
+                      title="open vault settings (members, invites, visits, ownership…)"
+                    >
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                      </svg>
+                      <span>MANAGE VAULT</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── MEMBER ACTIONS — switch / join, branch of powers, leave ── */}
+              <div className="vbrowser__actionbar vbrowser__actionbar--member">
+                <div className="vbrowser__actionbar-label">
+                  {myRole ? `MEMBER · ${myRole.toUpperCase()} POWERS` : 'OUTSIDER'}
+                </div>
+
+                <div className="vbrowser__actionbar-row">
+                  {/* Primary action: switch active / request join */}
+                  {isOwnVault && (
+                    <div className="vbrowser__actionbar-aside">
+                      you own this vault. open the terminal to manage it.
+                    </div>
+                  )}
+                  {!isOwnVault && myRole && (
+                    <button
+                      className="vbrowser__btn vbrowser__btn--primary"
+                      onClick={() => { setActiveVault(info.id); setJoinStatus('switched') }}
+                    >
+                      SWITCH ACTIVE
+                    </button>
+                  )}
+                  {!myRole && (
+                    <button
+                      className="vbrowser__btn vbrowser__btn--primary"
+                      onClick={requestJoin}
+                      disabled={joinStatus === 'sending' || !!pendingId}
+                    >
+                      {pendingId
+                        ? 'JOIN REQUEST PENDING'
+                        : joinStatus === 'sending'
+                          ? 'SENDING…'
+                          : 'REQUEST TO JOIN'}
+                    </button>
+                  )}
+
+                  {/* BRANCH OF POWERS — visible for any vault the user can see */}
+                  <button
+                    className="vbrowser__btn vbrowser__btn--branch"
+                    onClick={openPowerStructure}
+                    title="see the power structure of this vault"
+                  >
+                    BRANCH OF POWERS
+                  </button>
+
+                  {/* MEMBER-only: leave vault */}
+                  {myRole === 'member' && !isOwnVault && (
+                    <button
+                      className="vbrowser__btn vbrowser__btn--ghost"
+                      onClick={async () => {
+                        if (!confirm('leave this vault? you will lose access to all its archives.')) return
+                        const r = await doFireVaultMember(info.id, user.id, ctx())
+                        if (r?.ok) {
+                          await loadList()
+                          setJoinStatus('switched')
+                        } else {
+                          setError(`leave failed: ${r?.reason || 'unknown'}`)
+                        }
+                      }}
+                    >
+                      LEAVE VAULT
+                    </button>
+                  )}
+                </div>
+
+                {joinStatus === 'sent' && (
+                  <div className="vbrowser__actionbar-status vbrowser__ok">
+                    request sent. admin/owner will review.
                   </div>
                 )}
-                {!isOwnVault && myRole && (
-                  <button
-                    className="vbrowser__btn vbrowser__btn--primary"
-                    onClick={() => { setActiveVault(info.id); setJoinStatus('switched') }}
-                  >
-                    SWITCH ACTIVE VAULT
-                  </button>
-                )}
-                {!myRole && (
-                  <button
-                    className="vbrowser__btn vbrowser__btn--primary"
-                    onClick={requestJoin}
-                    disabled={joinStatus === 'sending' || !!pendingId}
-                  >
-                    {pendingId
-                      ? 'JOIN REQUEST PENDING'
-                      : joinStatus === 'sending'
-                        ? 'SENDING…'
-                        : 'REQUEST TO JOIN'}
-                  </button>
-                )}
-                {joinStatus === 'sent' && (
-                  <span className="vbrowser__ok">request sent. admin/owner will review.</span>
-                )}
                 {joinStatus.startsWith('err:') && (
-                  <span className="vbrowser__err-inline">denied: {joinStatus.slice(4)}</span>
+                  <div className="vbrowser__actionbar-status vbrowser__err-inline">
+                    denied: {joinStatus.slice(4)}
+                  </div>
                 )}
                 {joinStatus === 'switched' && (
-                  <span className="vbrowser__ok">active vault is now {info.id}.</span>
-                )}
-
-                {/* BRANCH OF POWERS — visible for any vault the user can see */}
-                <button
-                  className="vbrowser__btn vbrowser__btn--branch"
-                  onClick={openPowerStructure}
-                  title="see the power structure of this vault"
-                >
-                  BRANCH OF POWERS
-                </button>
-
-                {/* MANAGE — owner/admin only, opens the full vault settings GUI */}
-                {(isOwnVault || myRole === 'admin') && (
-                  <button
-                    className="vbrowser__btn vbrowser__btn--manage"
-                    onClick={() => setSettingsOpen(true)}
-                    title="open vault settings (members, invites, visits, ownership…)"
-                  >
-                    ⚙ MANAGE VAULT
-                  </button>
-                )}
-                {/* MEMBER-only: leave vault button */}
-                {myRole === 'member' && !isOwnVault && (
-                  <button
-                    className="vbrowser__btn vbrowser__btn--ghost"
-                    onClick={async () => {
-                      if (!confirm('leave this vault? you will lose access to all its archives.')) return
-                      const r = await doFireVaultMember(info.id, user.id, ctx())
-                      if (r?.ok) {
-                        await loadList()
-                        setJoinStatus('switched')
-                      } else {
-                        setError(`leave failed: ${r?.reason || 'unknown'}`)
-                      }
-                    }}
-                  >
-                    LEAVE VAULT
-                  </button>
+                  <div className="vbrowser__actionbar-status vbrowser__ok">
+                    active vault is now {info.id}.
+                  </div>
                 )}
               </div>
 
