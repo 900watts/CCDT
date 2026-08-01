@@ -395,11 +395,12 @@ function PowerPyramid({ rows }) {
 
   const CLR_LABEL = { 1: 'PUBLIC', 2: 'CONFIDENTIAL', 3: 'SECRET', 4: 'TOP SECRET' }
 
-  // Render bottom-up so the apex sits on top.
+  // Render top-down: highest (APEX owner) at the top, lowest (TIER 3 members)
+  // at the bottom — the natural reading order.
   const ordered = ['owner', 'admin', 'member']
   return (
     <div className="vbrowser__pyramid">
-      {[...ordered].reverse().map((bucket) => {
+      {ordered.map((bucket) => {
         const tier = TIER_STYLE[bucket]
         const list = groups[bucket]
         if (!list || list.length === 0) return null
