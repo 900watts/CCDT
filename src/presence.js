@@ -61,6 +61,19 @@ function _handleBroadcast(payload) {
   _peers.set(tab, { tab, profile, ts, lastSeen: Date.now() })
 }
 
+// Auto-reply to "who" queries by re-broadcasting our own join, so the
+// requester gets a fresh snapshot even from peers that haven't pinged
+// recently. Guarded against loops: we only respond if the query came
+// from someone else, and we send a regular join (not a who), so it
+// just updates the requester's peer cache.
+function _handleWhoQuery(fromTab) {
+  if (!fromTab || fromTab === TAB_ID) return
+  if (!_channel || !_myProfile) return
+  try {
+    _channel.send({ type: 'broadcast', event: 'join', payload: _payload() })
+  } catch {}
+}
+
 function _pruneStale(now) {
   for (const [tab, peer] of _peers) {
     if (now - (peer.lastSeen || peer.ts || 0) > STALE_AFTER_MS) {
@@ -92,7 +105,16 @@ export function bindPresence(supabase, user) {
   }
 
   _channel = supabase.channel(CHANNEL, { config: { broadcast: { ack: false } } })
-    .on('broadcast', { event: '*' }, (msg) => _handleBroadcast(msg?.payload))
+    .on('broadcast', { event: '*' }, (msg) => {
+      const payload = msg?.payload
+      // Differentiate event types since we subscribed with event:'*'
+      const evt = msg?.event || payload?.event
+      if (evt === 'who') {
+        // Someone is asking who's here — auto-reply with our own profile.
+        _handleWhoQuery(payload?.from)
+      }
+      _handleBroadcast(payload)
+    })
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         try { _channel.send({ type: 'broadcast', event: 'join', payload: _payload() }) } catch {}
@@ -127,6 +149,24 @@ export function unbindPresence() {
   if (_expirySweep) { clearInterval(_expirySweep); _expirySweep = null }
   _myProfile = null
   _peers.clear()
+}
+
+// Public: refresh the local peer cache by broadcasting a "who-here" ping
+// and waiting a short window for everyone to respond. Returns the updated
+// peer list. This is what the `who` command calls so the user sees a live
+// snapshot at command time, not whatever was last broadcast.
+let _querySeq = 0
+export async function refreshPeers(supabase, waitMs = 800) {
+  if (!supabase || !_channel || !_myProfile) return getOnlinePeers()
+  const seq = ++_querySeq
+  try {
+    _channel.send({ type: 'broadcast', event: 'who', payload: { seq, from: TAB_ID } })
+  } catch {}
+  // Wait briefly so peers can respond (they each auto-reply with their profile).
+  await new Promise((resolve) => setTimeout(resolve, waitMs))
+  // Stale-sweep before returning so dropped tabs don't show up.
+  _pruneStale(Date.now())
+  return getOnlinePeers()
 }
 
 // Public: get the current snapshot of online peers. Includes the current

@@ -11,7 +11,7 @@ import {
   demoUsernames, demoMessages,
   demoAddMessage, demoMarkRead
 } from '../store'
-import { getOnlinePeers } from '../presence'
+import { getOnlinePeers, refreshPeers } from '../presence'
 import { getClearance, isO5, O5_LEVEL, clearanceLabel, O5_FOUNDER_EMAIL } from '../o5'
 
 export { getClearance, isO5, O5_LEVEL, clearanceLabel }
@@ -364,11 +364,18 @@ async function _enrichPeers(supabase, profiles) {
   if (!supabase || !profiles?.length) return profiles
   const ids = profiles.map((p) => p?.id).filter(Boolean)
   if (!ids.length) return profiles
-  const { data } = await supabase
-    .from('users')
-    .select('id,username')
-    .in('id', ids)
-    .catch(() => ({ data: null }))
+  // Supabase JS query builders are thenable but don't expose .catch()
+  // directly — wrap the await in a try/catch instead.
+  let data = null
+  try {
+    const res = await supabase
+      .from('users')
+      .select('id,username')
+      .in('id', ids)
+    data = res?.data || null
+  } catch {
+    data = null
+  }
   if (!data) return profiles
   const byId = new Map(data.map((u) => [u.id, u]))
   return profiles.map((p) => {
@@ -386,8 +393,16 @@ async function who(args, ctx) {
   // Available even without auth — DEMO mode shows the local tab + any
   // real session; authenticated mode shows everyone connected.
   let peers
-  try { peers = getOnlinePeers() } catch (e) {
-    return [{ cls: 'err', text: `WHO failed (presence module): ${e.message}` }]
+  try {
+    // Live scan: broadcast a "who" ping to the realtime channel and wait
+    // ~1s for everyone to respond with their profile. Without this, a tab
+    // that just opened wouldn't appear in `who` until its next heartbeat
+    // (up to 15s later). refreshPeers is a no-op in DEMO mode.
+    peers = await refreshPeers(ctx.supabase, 1000)
+  } catch (e) {
+    try { peers = getOnlinePeers() } catch {
+      return [{ cls: 'err', text: `WHO failed (presence module): ${e.message}` }]
+    }
   }
 
   // Enrich from public.users so peers appear with their username even when
