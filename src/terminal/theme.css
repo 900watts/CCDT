@@ -1793,23 +1793,34 @@ html, body, #root {
 }
 /* ── BRANCH OF POWERS modal + pyramid ────────────────────────────────── */
 .vbrowser__btn--branch {
-  background: transparent !important;
-  border: 1px solid rgba(255, 209, 102, 0.35) !important;
+  background: rgba(255, 209, 102, 0.06) !important;
+  border: 1px solid rgba(255, 209, 102, 0.45) !important;
   color: #ffd166 !important;
-  margin-top: 10px;
-  letter-spacing: 2px;
+  margin-top: 14px;
+  padding: 8px 18px !important;
+  letter-spacing: 2.5px;
+  font-weight: 700;
   position: relative;
   overflow: hidden;
+  display: inline-block !important;
+  align-self: flex-start;
+  animation: vbp-btn-pulse 2.4s ease-in-out infinite;
+}
+@keyframes vbp-btn-pulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(255, 209, 102, 0) }
+  50% { box-shadow: 0 0 14px rgba(255, 209, 102, 0.25) }
 }
 .vbrowser__btn--branch::before {
   content: "◆";
   margin-right: 8px;
   color: #ffd166;
+  text-shadow: 0 0 6px rgba(255, 209, 102, 0.6);
 }
 .vbrowser__btn--branch:hover {
-  background: rgba(255, 209, 102, 0.08) !important;
+  background: rgba(255, 209, 102, 0.14) !important;
   border-color: #ffd166 !important;
-  box-shadow: 0 0 12px rgba(255, 209, 102, 0.25);
+  box-shadow: 0 0 18px rgba(255, 209, 102, 0.45);
+  animation: none;
 }
 
 .vbrowser__power-overlay {
