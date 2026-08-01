@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { supabase, isConfigured } from './supabaseClient'
 import { demoStore } from './store'
-import { doCreateJoinRequest, fetchOne, setActiveVault } from './terminal/commands'
+import { doCreateJoinRequest, doFireVaultMember, fetchOne, setActiveVault } from './terminal/commands'
 import { openDossierWindow } from './dossierWindow'
+import VaultSettings from './VaultSettings'
 
 // Card colors keyed by role. Public vaults get a green accent.
 const ROLE_COLOR = {
@@ -28,6 +29,8 @@ export default function VaultBrowser({ user }) {
   const [powerRows, setPowerRows] = useState([])
   const [powerLoading, setPowerLoading] = useState(false)
   const [powerErr, setPowerErr] = useState('')
+  // ── VAULT SETTINGS modal state ──
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const ctx = () => ({ supabase, isConfigured, user, demoData: demoStore })
 
@@ -290,6 +293,35 @@ export default function VaultBrowser({ user }) {
                 >
                   BRANCH OF POWERS
                 </button>
+
+                {/* MANAGE — owner/admin only, opens the full vault settings GUI */}
+                {(isOwnVault || myRole === 'admin') && (
+                  <button
+                    className="vbrowser__btn vbrowser__btn--manage"
+                    onClick={() => setSettingsOpen(true)}
+                    title="open vault settings (members, invites, visits, ownership…)"
+                  >
+                    ⚙ MANAGE VAULT
+                  </button>
+                )}
+                {/* MEMBER-only: leave vault button */}
+                {myRole === 'member' && !isOwnVault && (
+                  <button
+                    className="vbrowser__btn vbrowser__btn--ghost"
+                    onClick={async () => {
+                      if (!confirm('leave this vault? you will lose access to all its archives.')) return
+                      const r = await doFireVaultMember(info.id, user.id, ctx())
+                      if (r?.ok) {
+                        await loadList()
+                        setJoinStatus('switched')
+                      } else {
+                        setError(`leave failed: ${r?.reason || 'unknown'}`)
+                      }
+                    }}
+                  >
+                    LEAVE VAULT
+                  </button>
+                )}
               </div>
 
               <div className="vbrowser__archives-header">
@@ -347,6 +379,16 @@ export default function VaultBrowser({ user }) {
             )}
           </div>
         </div>
+      )}
+
+      {/* ── VAULT SETTINGS modal (owner/admin only — guarded by the button) ── */}
+      {settingsOpen && selected && info && (isOwnVault || myRole === 'admin') && (
+        <VaultSettings
+          vaultId={selected}
+          myRole={myRole}
+          onClose={() => setSettingsOpen(false)}
+          onChange={() => loadList()}
+        />
       )}
     </div>
   )
