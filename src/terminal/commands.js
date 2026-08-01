@@ -906,7 +906,9 @@ export async function fetchInbox(ctx) {
   const username = await getMyUsername(ctx)
   if (!username) return []
   if (ctx.isConfigured) {
-    const { data, error } = await ctx.supabase.rpc('peek_inbox', { p_username: username })
+    const { data, error } = await ctx.supabase.rpc('peek_inbox', {
+      p_username: username, p_vault_id: getActiveVault()
+    })
     if (error) return []
     return data || []
   }
@@ -917,7 +919,9 @@ export async function fetchInbox(ctx) {
 
 export async function fetchSent(ctx) {
   if (ctx.isConfigured) {
-    const { data, error } = await ctx.supabase.rpc('peek_sent', { p_userid: ctx.user.id })
+    const { data, error } = await ctx.supabase.rpc('peek_sent', {
+      p_userid: ctx.user.id, p_vault_id: getActiveVault()
+    })
     if (error) return []
     return data || []
   }
@@ -930,7 +934,9 @@ export async function fetchMessage(id, ctx) {
   if (ctx.isConfigured) {
     const username = await getMyUsername(ctx)
     if (!username) return null
-    const { data, error } = await ctx.supabase.rpc('peek_inbox', { p_username: username })
+    const { data, error } = await ctx.supabase.rpc('peek_inbox', {
+      p_username: username, p_vault_id: getActiveVault()
+    })
     if (error || !data) return null
     return data.find((m) => m.id === id) || null
   }
@@ -952,8 +958,10 @@ export async function doSendMessage({ recipient, subject, body, priority, classi
   if (pri === 'o5' && !isO5(ctx)) return { ok: false, reason: 'O5 priority requires O5 council clearance' }
 
   if (ctx.isConfigured) {
+    const vaultId = getActiveVault()
     const { data, error } = await ctx.supabase.rpc('peek_send_message', {
-      p_recipient: r, p_subject: subject, p_body: body, p_priority: pri, p_classification: cls
+      p_recipient: r, p_subject: subject, p_body: body, p_priority: pri, p_classification: cls,
+      p_vault_id: vaultId
     })
     if (error) return { ok: false, reason: error.message }
     if (data?.status === 'not_found') return { ok: false, reason: `recipient "${r}" does not exist` }

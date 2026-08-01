@@ -1274,3 +1274,141 @@ revoke execute on function public.peek_all_archives_vault(citext, int) from publ
 grant  execute on function public.peek_all_archives_vault(citext, int) to authenticated;
 
 -- (peek_all_archives remains as the global O5 cross-vault view, unchanged)
+-- ════════════════════════════════════════════════════════════════════════════
+-- 35) Vault-scope existing peek_inbox / peek_sent
+--     Originally defined in migration_002 (single-arg). Replaced with
+--     versions that take p_vault_id and filter rows accordingly. NULL
+--     p_vault_id falls back to the user's first vault (legacy behaviour).
+-- ════════════════════════════════════════════════════════════════════════════
+drop function if exists public.peek_inbox(citext);
+create function public.peek_inbox(p_username citext, p_vault_id citext default null)
+returns table (
+  id uuid, subject text, body text, priority text, classification text,
+  sender_email text, sender_username citext,
+  read_at timestamptz, created_at timestamptz, vault_id citext
+) language sql stable security definer set search_path = public as $$
+  select m.id, m.subject, m.body, m.priority, m.classification,
+         au.email::text as sender_email,
+         s.username as sender_username,
+         m.read_at, m.created_at, m.vault_id
+  from public.messages m
+  left join auth.users au on au.id = m.sender_id
+  left join public.users s on s.id = m.sender_id
+  where m.recipient = lower(p_username)
+    and (p_vault_id is null or m.vault_id = p_vault_id)
+    and (
+      public.user_clearance() >= 2
+      or public.is_vault_member(coalesce(p_vault_id, m.vault_id))
+      or (
+        m.classification = 'PUBLIC'
+        and public.vault_is_public(coalesce(p_vault_id, m.vault_id))
+      )
+    )
+  order by m.created_at desc
+  limit 200;
+$$;
+
+revoke execute on function public.peek_inbox(citext, citext) from public;
+grant  execute on function public.peek_inbox(citext, citext) to authenticated;
+
+drop function if exists public.peek_sent(uuid);
+create function public.peek_sent(p_userid uuid, p_vault_id citext default null)
+returns table (
+  id uuid, subject text, body text, priority text, classification text,
+  recipient citext, read_at timestamptz, created_at timestamptz, vault_id citext
+) language sql stable security definer set search_path = public as $$
+  select m.id, m.subject, m.body, m.priority, m.classification,
+         m.recipient, m.read_at, m.created_at, m.vault_id
+  from public.messages m
+  where m.sender_id = p_userid
+    and (p_vault_id is null or m.vault_id = p_vault_id)
+    and (
+      public.user_clearance() >= 2
+      or public.is_vault_member(coalesce(p_vault_id, m.vault_id))
+    )
+  order by m.created_at desc
+  limit 200;
+$$;
+
+revoke execute on function public.peek_sent(uuid, citext) from public;
+grant  execute on function public.peek_sent(uuid, citext) to authenticated;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 36) DROP the old 5-arg peek_send_message overload
+--     The 6-arg version above (with p_vault_id) supersedes it. The 5-arg
+--     version would now be a security hole (every send is unscoped to
+--     a vault). Keeping both also makes PostgREST ambiguous about which
+--     to call when a default null is passed for p_vault_id.
+-- ════════════════════════════════════════════════════════════════════════════
+drop function if exists public.peek_send_message(citext, text, text, text, text);
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 37) Public vault browser RPCs (added after the initial migration_006
+--     so the VAULTS tab can show discoverable vaults to outsiders).
+-- ════════════════════════════════════════════════════════════════════════════
+create or replace function public.peek_list_public_vaults()
+returns table (
+  id citext, display_name text, owner_display text,
+  member_count bigint, public_archive_count bigint, created_at timestamptz
+) language sql stable security definer set search_path = public as $$
+  select v.id, v.display_name,
+         coalesce(p.username::text, split_part(au.email::text,'@',1)) as owner_display,
+         (select count(*) from public.vault_members m where m.vault_id = v.id) as member_count,
+         (select count(*) from public.archives a where a.vault_id = v.id and a.classification = 'PUBLIC') as public_archive_count,
+         v.created_at
+  from public.vaults v
+  left join public.users p on p.id = v.owner_id
+  left join auth.users au on au.id = v.owner_id
+  where v.is_public = true
+  order by v.created_at asc;
+$$;
+
+revoke execute on function public.peek_list_public_vaults() from public;
+grant  execute on function public.peek_list_public_vaults() to authenticated;
+
+create or replace function public.peek_get_vault_public_info(p_vault_id citext)
+returns jsonb language sql stable security definer set search_path = public as $$
+  with v as (select id, display_name, owner_id, is_public, created_at from public.vaults where id = p_vault_id),
+       is_member as (select exists (select 1 from public.vault_members
+                                      where vault_id = p_vault_id and user_id = auth.uid()) as ok)
+  select case
+    when not exists (select 1 from v) then null
+    when not ((select is_public from v) or (select ok from is_member)) then null
+    else jsonb_build_object(
+      'id', (select id from v),
+      'display_name', (select display_name from v),
+      'is_public', (select is_public from v),
+      'owner_display', coalesce(
+        (select p.username::text from public.users p where p.id = (select owner_id from v)),
+        (select split_part(au.email::text,'@',1) from auth.users au where au.id = (select owner_id from v))
+      ),
+      'member_count', (select count(*) from public.vault_members m where m.vault_id = p_vault_id),
+      'public_archive_count', (select count(*) from public.archives a where a.vault_id = p_vault_id and a.classification = 'PUBLIC'),
+      'my_role', (select role::text from public.vault_members where vault_id = p_vault_id and user_id = auth.uid()),
+      'my_clearance', (select clearance from public.vault_members where vault_id = p_vault_id and user_id = auth.uid()),
+      'pending_request_id', (select id::text from public.vault_join_requests
+                               where vault_id = p_vault_id and requester_id = auth.uid() and status = 'pending'),
+      'created_at', (select created_at from v)
+    )
+  end
+$$;
+
+revoke execute on function public.peek_get_vault_public_info(citext) from public;
+grant  execute on function public.peek_get_vault_public_info(citext) to authenticated;
+
+create or replace function public.peek_list_public_archives_of_vault(p_vault_id citext, p_limit int default 100)
+returns table (id uuid, archive_number text, title text, department text,
+              created_at timestamptz, updated_at timestamptz)
+language sql stable security definer set search_path = public as $$
+  select a.id, a.archive_number, a.title, a.department, a.created_at, a.updated_at
+  from public.archives a
+  join public.vaults v on v.id = a.vault_id
+  where a.vault_id = p_vault_id
+    and a.classification = 'PUBLIC'
+    and (v.is_public = true or public.is_vault_member(p_vault_id))
+  order by a.archive_number
+  limit p_limit;
+$$;
+
+revoke execute on function public.peek_list_public_archives_of_vault(citext, int) from public;
+grant  execute on function public.peek_list_public_archives_of_vault(citext, int) to authenticated;
