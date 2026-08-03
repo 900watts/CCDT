@@ -1773,8 +1773,12 @@ html, body, #root {
   white-space: nowrap;
   cursor: pointer;
   transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out),
-              box-shadow 160ms var(--ease-out), filter 160ms var(--ease-out);
+              box-shadow 160ms var(--ease-out), filter 160ms var(--ease-out),
+              transform 160ms var(--ease-out);
   border-radius: 0;
+  /* Establishes the base transform so per-variant hover can override cleanly */
+  transform: scale(1);
+  will-change: transform;
 }
 .vbrowser__actionbar-row > .vbrowser__btn:disabled {
   opacity: 0.4;
@@ -1801,26 +1805,35 @@ html, body, #root {
 }
 
 /* ── Button variants — all share the same height/typography set above ── */
-/* Hover rule: NEVER replace the background colour on hover. The flash
-   from solid → bright is what blinds the user. Instead, leave the base
-   colour and add a subtle outer glow + small brightness lift. The
-   button reads as "interactive" without ever becoming a different colour. */
+/* Animation: smooth scale + brightness + outer-glow lift on hover, small
+   press dip on active. Scale is the strongest perceived motion cue so
+   even a 3% lift makes the button feel interactive. Transitions are
+   declared on the base rule above so all variants inherit them. */
 .vbrowser__btn--primary {
   background: #38ff9a;
   color: #050b08;
   border: 1px solid #38ff9a;
   box-shadow: 0 0 0 1px rgba(56, 255, 154, 0.15) inset;
-  transition: filter 180ms var(--ease-out), box-shadow 180ms var(--ease-out);
+  /* Per-variant transition overrides the base so transform is included
+     (the base doesn't list it because not every base button scales) */
+  transition: transform 180ms var(--ease-out), filter 180ms var(--ease-out),
+              box-shadow 180ms var(--ease-out);
+  /* Establishes the base transform-origin for the scale */
+  transform: scale(1);
+  will-change: transform;
 }
 .vbrowser__btn--primary:hover:not(:disabled) {
-  /* Subtle brightness lift + outer glow, NOT a colour swap */
-  filter: brightness(1.08);
-  box-shadow: 0 0 0 1px rgba(56, 255, 154, 0.35) inset,
-              0 0 14px rgba(56, 255, 154, 0.35);
+  /* Hover: 3% scale up + 10% brightness + outer glow grows */
+  transform: scale(1.03);
+  filter: brightness(1.1);
+  box-shadow: 0 0 0 1px rgba(56, 255, 154, 0.4) inset,
+              0 0 18px rgba(56, 255, 154, 0.5);
 }
 .vbrowser__btn--primary:active:not(:disabled) {
-  /* Pressed: tiny brightness dip for tactile feedback */
+  /* Active: tiny press dip — 2% smaller + brightness down for tactile feel */
+  transform: scale(0.98);
   filter: brightness(0.95);
+  transition-duration: 80ms;  /* faster snap on press */
 }
 
 /* BRANCH OF POWERS — amber outline, transparent base. Hover lifts the
@@ -1829,8 +1842,10 @@ html, body, #root {
   background: transparent;
   color: #ffd166;
   border: 1px solid rgba(255, 209, 102, 0.5);
-  transition: border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out),
-              filter 180ms var(--ease-out);
+  transition: transform 180ms var(--ease-out), border-color 180ms var(--ease-out),
+              box-shadow 180ms var(--ease-out), filter 180ms var(--ease-out);
+  transform: scale(1);
+  will-change: transform;
 }
 .vbrowser__btn--branch::before {
   content: "◆";
@@ -1838,9 +1853,15 @@ html, body, #root {
   text-shadow: 0 0 6px rgba(255, 209, 102, 0.6);
 }
 .vbrowser__btn--branch:hover:not(:disabled) {
+  transform: scale(1.03);
   border-color: #ffd166;
   box-shadow: 0 0 12px rgba(255, 209, 102, 0.3);
-  filter: brightness(1.1);
+  filter: brightness(1.15);
+}
+.vbrowser__btn--branch:active:not(:disabled) {
+  transform: scale(0.98);
+  filter: brightness(0.95);
+  transition-duration: 80ms;
 }
 
 /* MANAGE — owner/admin action. Same no-fill-on-hover rule. */
@@ -1849,13 +1870,21 @@ html, body, #root {
   color: #38ff9a;
   border: 1px solid rgba(56, 255, 154, 0.55);
   font-weight: 700;
-  transition: border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out),
-              filter 180ms var(--ease-out);
+  transition: transform 180ms var(--ease-out), border-color 180ms var(--ease-out),
+              box-shadow 180ms var(--ease-out), filter 180ms var(--ease-out);
+  transform: scale(1);
+  will-change: transform;
 }
 .vbrowser__btn--manage:hover:not(:disabled) {
+  transform: scale(1.03);
   border-color: #38ff9a;
   box-shadow: 0 0 14px rgba(56, 255, 154, 0.35);
-  filter: brightness(1.1);
+  filter: brightness(1.15);
+}
+.vbrowser__btn--manage:active:not(:disabled) {
+  transform: scale(0.98);
+  filter: brightness(0.95);
+  transition-duration: 80ms;
 }
 
 /* GHOST — the LEAVE button. Stays subtle on hover. */
@@ -1863,13 +1892,21 @@ html, body, #root {
   background: transparent;
   color: #6a9980;
   border: 1px solid rgba(56, 255, 154, 0.25);
-  transition: color 180ms var(--ease-out), border-color 180ms var(--ease-out),
-              filter 180ms var(--ease-out);
+  transition: transform 180ms var(--ease-out), color 180ms var(--ease-out),
+              border-color 180ms var(--ease-out), filter 180ms var(--ease-out);
+  transform: scale(1);
+  will-change: transform;
 }
 .vbrowser__btn--ghost:hover:not(:disabled) {
+  transform: scale(1.03);
   color: #b6ffd9;
   border-color: rgba(56, 255, 154, 0.6);
-  filter: brightness(1.1);
+  filter: brightness(1.15);
+}
+.vbrowser__btn--ghost:active:not(:disabled) {
+  transform: scale(0.98);
+  filter: brightness(0.95);
+  transition-duration: 80ms;
 }
 
 .vbrowser__badge {
