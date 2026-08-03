@@ -1794,15 +1794,75 @@ html, body, #root {
 }
 
 /* ── Button variants — all share the same height/typography set above ── */
+/* Hover rule: NEVER replace the background colour on hover. The flash
+   from solid → bright is what blinds the user. Instead, leave the base
+   colour and add a subtle outer glow + small brightness lift. The
+   button reads as "interactive" without ever becoming a different colour. */
 .vbrowser__btn--primary {
   background: #38ff9a;
   color: #050b08;
   border: 1px solid #38ff9a;
   box-shadow: 0 0 0 1px rgba(56, 255, 154, 0.15) inset;
+  transition: filter 180ms var(--ease-out), box-shadow 180ms var(--ease-out);
 }
 .vbrowser__btn--primary:hover:not(:disabled) {
-  background: #6effce;
-  box-shadow: 0 0 12px rgba(56, 255, 154, 0.5);
+  /* Subtle brightness lift + outer glow, NOT a colour swap */
+  filter: brightness(1.08);
+  box-shadow: 0 0 0 1px rgba(56, 255, 154, 0.35) inset,
+              0 0 14px rgba(56, 255, 154, 0.35);
+}
+.vbrowser__btn--primary:active:not(:disabled) {
+  /* Pressed: tiny brightness dip for tactile feedback */
+  filter: brightness(0.95);
+}
+
+/* BRANCH OF POWERS — amber outline, transparent base. Hover lifts the
+   border brightness without filling the background. */
+.vbrowser__btn--branch {
+  background: transparent;
+  color: #ffd166;
+  border: 1px solid rgba(255, 209, 102, 0.5);
+  transition: border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out),
+              filter 180ms var(--ease-out);
+}
+.vbrowser__btn--branch::before {
+  content: "◆";
+  color: #ffd166;
+  text-shadow: 0 0 6px rgba(255, 209, 102, 0.6);
+}
+.vbrowser__btn--branch:hover:not(:disabled) {
+  border-color: #ffd166;
+  box-shadow: 0 0 12px rgba(255, 209, 102, 0.3);
+  filter: brightness(1.1);
+}
+
+/* MANAGE — owner/admin action. Same no-fill-on-hover rule. */
+.vbrowser__btn--manage {
+  background: rgba(56, 255, 154, 0.06);
+  color: #38ff9a;
+  border: 1px solid rgba(56, 255, 154, 0.55);
+  font-weight: 700;
+  transition: border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out),
+              filter 180ms var(--ease-out);
+}
+.vbrowser__btn--manage:hover:not(:disabled) {
+  border-color: #38ff9a;
+  box-shadow: 0 0 14px rgba(56, 255, 154, 0.35);
+  filter: brightness(1.1);
+}
+
+/* GHOST — the LEAVE button. Stays subtle on hover. */
+.vbrowser__btn--ghost {
+  background: transparent;
+  color: #6a9980;
+  border: 1px solid rgba(56, 255, 154, 0.25);
+  transition: color 180ms var(--ease-out), border-color 180ms var(--ease-out),
+              filter 180ms var(--ease-out);
+}
+.vbrowser__btn--ghost:hover:not(:disabled) {
+  color: #b6ffd9;
+  border-color: rgba(56, 255, 154, 0.6);
+  filter: brightness(1.1);
 }
 
 .vbrowser__badge {
