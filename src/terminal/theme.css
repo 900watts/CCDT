@@ -1570,7 +1570,14 @@ html, body, #root {
   letter-spacing: 1px;
   transition: color 180ms var(--ease-out), border-color 180ms var(--ease-out);
 }
-.vbrowser__btn:hover { color: #38ff9a; border-color: #38ff9a; }
+/* Base hover: only applies to buttons WITHOUT a variant class (the plain
+   .vbrowser__btn used elsewhere). Variant classes (--primary, --branch,
+   --manage, --ghost) each define their own hover so they don't inherit
+   a one-size-fits-all green-on-green hover that washes out the text. */
+.vbrowser__btn:not([class*="--"]):hover {
+  color: #38ff9a;
+  border-color: #38ff9a;
+}
 .vbrowser__btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .vbrowser__err {
   background: rgba(255, 91, 91, 0.1);
@@ -1766,7 +1773,7 @@ html, body, #root {
   white-space: nowrap;
   cursor: pointer;
   transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out),
-              color 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
+              box-shadow 160ms var(--ease-out), filter 160ms var(--ease-out);
   border-radius: 0;
 }
 .vbrowser__actionbar-row > .vbrowser__btn:disabled {
