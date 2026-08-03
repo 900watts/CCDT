@@ -127,6 +127,7 @@ const HELP_BASE = [
   { cls: 'sys',  text: '      admin cannot grant clearance higher than their own' },
   { cls: 'sys',  text: '  fire <vault> <user>   remove a member from a vault (now an outsider)' },
   { cls: 'sys',  text: '  vaultpass <v> <old> <new>   owner resets the vault password' },
+  { cls: 'sys',  text: '  vaultname <v> <new name>    owner renames the vault (1-80 chars)' },
   { cls: 'sys',  text: '  transfervault <v> to <user>    owner initiates ownership transfer' },
   { cls: 'sys',  text: '  accepttransfer <token>         target accepts ownership offer' },
   { cls: 'sys',  text: '  declinetransfer <token>        target declines ownership offer' },
@@ -1258,6 +1259,8 @@ export async function runCommand(raw, ctx) {
     // ─────── INLINE VAULT ACTIONS (auth required) ───────
     case 'vaultpass':
       return vaultPass(args[0], args[1], args[2], ctx)
+    case 'vaultname':
+      return vaultNameInline(args, ctx)
     case 'vault':
       return vaultCreateInline(args, ctx)
     case 'invite':
@@ -1316,6 +1319,28 @@ async function vaultApproveJoinInline(args, ctx) { return inlineVaultApproveJoin
 async function vaultDeclineJoinInline(args, ctx) { return inlineVaultDeclineJoin(args, ctx) }
 
 // Concrete inline handlers ──────────────────────────────────────────────────
+async function vaultNameInline(args, ctx) {
+  if (!ctx.user) return [{ cls: 'err', text: 'VAULTNAME — authentication required.' }]
+  if (args.length < 2) {
+    return [{ cls: 'err', text: 'VAULTNAME — usage: vaultname <vault_id> <new_name>' }]
+  }
+  const vaultId = args[0]
+  const newName = args.slice(1).join(' ').trim()
+  if (!newName) return [{ cls: 'err', text: 'VAULTNAME — new name cannot be empty.' }]
+  if (newName.length > 80) return [{ cls: 'err', text: 'VAULTNAME — name too long (max 80 chars).' }]
+  if (!ctx.isConfigured) return [{ cls: 'dim', text: 'VAULTNAME — demo mode' }]
+  const { data, error } = await ctx.supabase.rpc('peek_set_vault_name', {
+    p_vault_id: vaultId,
+    p_display_name: newName,
+  })
+  if (error) return [{ cls: 'err', text: `VAULTNAME — ${error.message}` }]
+  if (data?.status !== 'ok') return [{ cls: 'err', text: `VAULTNAME — ${data?.reason || 'failed'}` }]
+  return [
+    { cls: 'ok',  text: `▶ vault "${vaultId}" renamed to "${newName}"` },
+    { cls: 'dim', text: '  the new name appears immediately in the vault browser and the prompt title.' }
+  ]
+}
+
 async function inlineVaultCreate(args, ctx) {
   const g = _resolveOwner(ctx); if (g) return g
   if (!args[0]) return [{ cls: 'err', text: 'VAULT — usage: vault <name> [password]' }]

@@ -105,13 +105,27 @@ export default function VaultSettings({ vaultId, myRole, user, onClose, onChange
     setMsg(text)
     setTimeout(() => setMsg(''), 2400)
   }
-  const wrap = async (fn, successText) => {
+  // wrap(fn, successText, opts?) — runs an action handler, shows a toast.
+  // opts.fullReload (default true): re-fetch ALL data (members, invites, etc.)
+  //   Set to false for actions that only touch `info` (rename, public toggle)
+  //   to avoid the modal flickering when 5 RPCs re-fire and re-render.
+  // opts.patchInfo: object to merge into info state immediately, for
+  //   instant feedback without any reload.
+  const wrap = async (fn, successText, opts = {}) => {
+    const { fullReload = true, patchInfo = null } = opts
     setBusy(true); setError('')
     try {
       const res = await fn()
       if (res?.ok) {
         flash(successText || 'done')
-        await load()
+        if (patchInfo) setInfo((cur) => cur ? { ...cur, ...patchInfo } : cur)
+        if (fullReload) {
+          await load()
+        } else if (!patchInfo) {
+          // No optimistic patch and no full reload — just refresh info
+          const r = await supabase.rpc('peek_get_vault_public_info', { p_vault_id: vaultId })
+          if (!r.error && r.data) setInfo(r.data)
+        }
         onChange?.()
       } else {
         setError(res?.reason || 'unknown error')
@@ -171,14 +185,26 @@ export default function VaultSettings({ vaultId, myRole, user, onClose, onChange
                     p_is_public: val,
                   })
                   if (error) return { ok: false, reason: error.message }
-                  // Surface the actual RPC response so we don't show a generic 'failed'
                   if (data && typeof data === 'object') {
                     if (data.status === 'ok') return { ok: true }
                     return { ok: false, reason: data.reason || `rpc returned status=${data.status}` }
                   }
-                  // RPC returned no data — treat as failure with a hint
                   return { ok: false, reason: 'rpc returned no data' }
-                }, `vault is_public = ${val}`)
+                }, `vault is_public = ${val}`, { fullReload: false, patchInfo: { is_public: val } })
+              }}
+              onRename={async (newName) => {
+                await wrap(async () => {
+                  const { data, error } = await supabase.rpc('peek_set_vault_name', {
+                    p_vault_id: vaultId,
+                    p_display_name: newName,
+                  })
+                  if (error) return { ok: false, reason: error.message }
+                  if (data && typeof data === 'object') {
+                    if (data.status === 'ok') return { ok: true }
+                    return { ok: false, reason: data.reason || `rpc returned status=${data.status}` }
+                  }
+                  return { ok: false, reason: 'rpc returned no data' }
+                }, 'vault renamed', { fullReload: false, patchInfo: { display_name: newName } })
               }}
               onPasswordChange={async (oldPw, newPw) => {
                 await wrap(
@@ -276,14 +302,62 @@ export default function VaultSettings({ vaultId, myRole, user, onClose, onChange
 }
 
 // ── TAB: Overview ────────────────────────────────────────────────────────────
-function OverviewTab({ info, vaultId, isOwner, canAdmin, busy, onPublicChange, onPasswordChange }) {
+function OverviewTab({ info, vaultId, isOwner, canAdmin, busy, onPublicChange, onPasswordChange, onRename }) {
   const [oldPw, setOldPw] = useState('')
   const [newPw, setNewPw] = useState('')
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState(info?.display_name || '')
   return (
     <div className="vset__pane">
       <div className="vset__row">
         <div className="vset__label">DISPLAY NAME</div>
-        <div className="vset__value">{info?.display_name || '—'}</div>
+        <div className="vset__value vset__value--name">
+          {editingName ? (
+            <>
+              <input
+                className="vset__input vset__input--name"
+                type="text"
+                value={nameDraft}
+                disabled={busy}
+                maxLength={80}
+                autoFocus
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { onRename(nameDraft.trim()); setEditingName(false) }
+                  if (e.key === 'Escape') { setEditingName(false); setNameDraft(info?.display_name || '') }
+                }}
+              />
+              <button
+                className="vset__btn vset__btn--small"
+                disabled={busy || !nameDraft.trim() || nameDraft.trim() === info?.display_name}
+                onClick={() => { onRename(nameDraft.trim()); setEditingName(false) }}
+              >
+                SAVE
+              </button>
+              <button
+                className="vset__btn vset__btn--ghost vset__btn--small"
+                disabled={busy}
+                onClick={() => { setEditingName(false); setNameDraft(info?.display_name || '') }}
+              >
+                CANCEL
+              </button>
+            </>
+          ) : (
+            <>
+              <span>{info?.display_name || '—'}</span>
+              {isOwner && (
+                <button
+                  className="vset__btn vset__btn--ghost vset__btn--small"
+                  disabled={busy}
+                  onClick={() => { setNameDraft(info?.display_name || ''); setEditingName(true) }}
+                  title="rename vault"
+                >
+                  EDIT
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
       <div className="vset__row">
         <div className="vset__label">OWNER</div>
