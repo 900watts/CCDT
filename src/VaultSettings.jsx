@@ -32,7 +32,7 @@ const TABS = [
 const ROLE_COLOR = { owner: '#ffd166', admin: '#38ff9a', member: '#6a9980' }
 const CLR_LABEL = { 1: 'PUBLIC', 2: 'CONFIDENTIAL', 3: 'SECRET', 4: 'TOP SECRET' }
 
-export default function VaultSettings({ vaultId, myRole, onClose, onChange }) {
+export default function VaultSettings({ vaultId, myRole, user, onClose, onChange }) {
   const [tab, setTab] = useState('overview')
   const [info, setInfo] = useState(null)
   const [members, setMembers] = useState([])
@@ -46,6 +46,7 @@ export default function VaultSettings({ vaultId, myRole, onClose, onChange }) {
 
   const isOwner = myRole === 'owner'
   const canAdmin = isOwner || myRole === 'admin'
+  const ctx = { supabase, isConfigured, user }
 
   // ── Load all the data the GUI needs ──
   const load = useCallback(async () => {
@@ -113,7 +114,7 @@ export default function VaultSettings({ vaultId, myRole, onClose, onChange }) {
         await load()
         onChange?.()
       } else {
-        setError(res?.reason || 'failed')
+        setError(res?.reason || 'unknown error')
       }
     } catch (e) {
       setError(e.message || String(e))
@@ -163,16 +164,25 @@ export default function VaultSettings({ vaultId, myRole, onClose, onChange }) {
           {!loading && tab === 'overview' && (
             <OverviewTab
               info={info} vaultId={vaultId} isOwner={isOwner} canAdmin={canAdmin}
-              busy={busy} onPublicChange={async (val) => {
-                await wrap(
-                  () => supabase.rpc('peek_set_vault_public', { p_vault_id: vaultId, p_is_public: val })
-                    .then(({ data, error }) => error ? { ok: false, reason: error.message } : data),
-                  `vault is_public = ${val}`
-                )
+              busy={busy}               onPublicChange={async (val) => {
+                await wrap(async () => {
+                  const { data, error } = await supabase.rpc('peek_set_vault_public', {
+                    p_vault_id: vaultId,
+                    p_is_public: val,
+                  })
+                  if (error) return { ok: false, reason: error.message }
+                  // Surface the actual RPC response so we don't show a generic 'failed'
+                  if (data && typeof data === 'object') {
+                    if (data.status === 'ok') return { ok: true }
+                    return { ok: false, reason: data.reason || `rpc returned status=${data.status}` }
+                  }
+                  // RPC returned no data — treat as failure with a hint
+                  return { ok: false, reason: 'rpc returned no data' }
+                }, `vault is_public = ${val}`)
               }}
               onPasswordChange={async (oldPw, newPw) => {
                 await wrap(
-                  () => doResetVaultPassword(vaultId, oldPw, newPw, { supabase, isConfigured, user: null }),
+                  () => doResetVaultPassword(vaultId, oldPw, newPw, ctx),
                   'password updated'
                 )
               }}
@@ -181,13 +191,14 @@ export default function VaultSettings({ vaultId, myRole, onClose, onChange }) {
           {!loading && tab === 'members' && (
             <MembersTab
               members={members} canAdmin={canAdmin} isOwner={isOwner} busy={busy}
+              currentUserId={user?.id}
               onSetRole={async (uid, role, clearance) => {
-                await wrap(() => doSetVaultMember(vaultId, uid, role, clearance, { supabase, isConfigured, user: null }),
+                await wrap(() => doSetVaultMember(vaultId, uid, role, clearance, ctx),
                   `member updated`)
               }}
               onFire={async (uid) => {
                 if (!confirm('fire this member? they will lose all access to this vault.')) return
-                await wrap(() => doFireVaultMember(vaultId, uid, { supabase, isConfigured, user: null }),
+                await wrap(() => doFireVaultMember(vaultId, uid, ctx),
                   'member removed from vault')
               }}
             />
@@ -196,7 +207,7 @@ export default function VaultSettings({ vaultId, myRole, onClose, onChange }) {
             <InvitesTab
               vaultId={vaultId} invites={invites} canAdmin={canAdmin} busy={busy}
               onInvite={async (username, role, clearance) => {
-                await wrap(() => doInviteToVault(vaultId, username, role, clearance, { supabase, isConfigured, user: null }),
+                await wrap(() => doInviteToVault(vaultId, username, role, clearance, ctx),
                   `invite sent to ${username}`)
               }}
               onRevoke={async (token) => {
@@ -214,11 +225,11 @@ export default function VaultSettings({ vaultId, myRole, onClose, onChange }) {
             <VisitsTab
               vaultId={vaultId} visits={visits} canAdmin={canAdmin} busy={busy}
               onGrant={async (username, clearance, hours) => {
-                await wrap(() => doGrantVisit(vaultId, username, clearance, hours, { supabase, isConfigured, user: null }),
+                await wrap(() => doGrantVisit(vaultId, username, clearance, hours, ctx),
                   `granted clearance to ${username} for ${hours}h`)
               }}
               onRevoke={async (username) => {
-                await wrap(() => doRevokeVisit(vaultId, username, { supabase, isConfigured, user: null }),
+                await wrap(() => doRevokeVisit(vaultId, username, ctx),
                   'visit grant revoked')
               }}
             />
@@ -227,7 +238,7 @@ export default function VaultSettings({ vaultId, myRole, onClose, onChange }) {
             <RequestsTab
               requests={requests} canAdmin={canAdmin} busy={busy}
               onResolve={async (id, approve) => {
-                await wrap(() => doResolveJoinRequest(id, approve, { supabase, isConfigured, user: null }),
+                await wrap(() => doResolveJoinRequest(id, approve, ctx),
                   approve ? 'approved' : 'declined')
               }}
             />
@@ -237,7 +248,7 @@ export default function VaultSettings({ vaultId, myRole, onClose, onChange }) {
               vaultId={vaultId} isOwner={isOwner} busy={busy}
               onTransfer={async (username) => {
                 if (!confirm(`transfer ownership of "${vaultId}" to ${username}? you will lose all access.`)) return
-                await wrap(() => doCreateTransfer(vaultId, username, { supabase, isConfigured, user: null }),
+                await wrap(() => doCreateTransfer(vaultId, username, ctx),
                   'transfer initiated. target must accept to complete.')
               }}
             />
@@ -357,7 +368,7 @@ function OverviewTab({ info, vaultId, isOwner, canAdmin, busy, onPublicChange, o
 }
 
 // ── TAB: Members ────────────────────────────────────────────────────────────
-function MembersTab({ members, canAdmin, isOwner, busy, onSetRole, onFire }) {
+function MembersTab({ members, canAdmin, isOwner, busy, currentUserId, onSetRole, onFire }) {
   // Editable inline — when user clicks the role/clearance pill, show a picker
   return (
     <div className="vset__pane">
@@ -366,6 +377,7 @@ function MembersTab({ members, canAdmin, isOwner, busy, onSetRole, onFire }) {
       {members.map((m) => (
         <MemberRow
           key={m.user_id} m={m} canAdmin={canAdmin} isOwner={isOwner} busy={busy}
+          currentUserId={currentUserId}
           onSetRole={onSetRole} onFire={onFire}
         />
       ))}
@@ -373,11 +385,11 @@ function MembersTab({ members, canAdmin, isOwner, busy, onSetRole, onFire }) {
   )
 }
 
-function MemberRow({ m, canAdmin, isOwner, busy, onSetRole, onFire }) {
+function MemberRow({ m, canAdmin, isOwner, busy, currentUserId, onSetRole, onFire }) {
   const [editing, setEditing] = useState(false)
   const [role, setRole] = useState(m.role)
   const [clearance, setClearance] = useState(m.clearance)
-  const isSelf = m.user_id === (window.__ccdtUser?.id || '')
+  const isSelf = m.user_id === (currentUserId || '')
   const canEditThis = canAdmin && !(m.role === 'owner' && !isOwner)  // owner row is read-only for non-owners
   const canFireThis = canAdmin && m.role !== 'owner' && !isSelf
 

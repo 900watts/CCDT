@@ -411,6 +411,7 @@ export default function VaultBrowser({ user }) {
         <VaultSettings
           vaultId={selected}
           myRole={myRole}
+          user={user}
           onClose={() => setSettingsOpen(false)}
           onChange={() => loadList()}
         />
